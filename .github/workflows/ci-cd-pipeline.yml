@@ -104,7 +104,7 @@ jobs:
           cache-to: type=gha,mode=max
           load: true
 
-      - name: Scan Auth Service image with Trivy
+      - name: Scan Auth Service image with Trivy (SARIF)
         uses: aquasecurity/trivy-action@master
         continue-on-error: true
         with:
@@ -114,6 +114,16 @@ jobs:
           severity: 'CRITICAL,HIGH'
           exit-code: '0'
 
+      - name: Scan Auth Service image with Trivy (JSON)
+        uses: aquasecurity/trivy-action@master
+        continue-on-error: true
+        with:
+          image-ref: ${{ env.DOCKER_USERNAME }}/task-manager-auth:${{ env.IMAGE_TAG }}
+          format: 'json'
+          output: 'trivy-auth-results.json'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          exit-code: '0'
+
       - name: Upload Trivy scan results
         uses: github/codeql-action/upload-sarif@v4
         if: always() && hashFiles('trivy-auth-results.sarif') != ''
@@ -121,6 +131,13 @@ jobs:
         with:
           sarif_file: 'trivy-auth-results.sarif'
           category: 'auth-service'
+
+      - name: Upload Trivy JSON results as artifact
+        uses: actions/upload-artifact@v4
+        if: always() && hashFiles('trivy-auth-results.json') != ''
+        with:
+          name: trivy-auth-results
+          path: trivy-auth-results.json
 
       - name: Push Auth Service image
         run: |
@@ -170,7 +187,7 @@ jobs:
           cache-to: type=gha,mode=max
           load: true
 
-      - name: Scan Task Service image with Trivy
+      - name: Scan Task Service image with Trivy (SARIF)
         uses: aquasecurity/trivy-action@master
         continue-on-error: true
         with:
@@ -180,6 +197,16 @@ jobs:
           severity: 'CRITICAL,HIGH'
           exit-code: '0'
 
+      - name: Scan Task Service image with Trivy (JSON)
+        uses: aquasecurity/trivy-action@master
+        continue-on-error: true
+        with:
+          image-ref: ${{ env.DOCKER_USERNAME }}/task-manager-task:${{ env.IMAGE_TAG }}
+          format: 'json'
+          output: 'trivy-task-results.json'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          exit-code: '0'
+
       - name: Upload Trivy scan results
         uses: github/codeql-action/upload-sarif@v4
         if: always() && hashFiles('trivy-task-results.sarif') != ''
@@ -187,6 +214,13 @@ jobs:
         with:
           sarif_file: 'trivy-task-results.sarif'
           category: 'task-service'
+
+      - name: Upload Trivy JSON results as artifact
+        uses: actions/upload-artifact@v4
+        if: always() && hashFiles('trivy-task-results.json') != ''
+        with:
+          name: trivy-task-results
+          path: trivy-task-results.json
 
       - name: Push Task Service image
         run: |
@@ -236,7 +270,7 @@ jobs:
           cache-to: type=gha,mode=max
           load: true
 
-      - name: Scan Frontend image with Trivy
+      - name: Scan Frontend image with Trivy (SARIF)
         uses: aquasecurity/trivy-action@master
         continue-on-error: true
         with:
@@ -246,6 +280,16 @@ jobs:
           severity: 'CRITICAL,HIGH'
           exit-code: '0'
 
+      - name: Scan Frontend image with Trivy (JSON)
+        uses: aquasecurity/trivy-action@master
+        continue-on-error: true
+        with:
+          image-ref: ${{ env.DOCKER_USERNAME }}/task-manager-frontend:${{ env.IMAGE_TAG }}
+          format: 'json'
+          output: 'trivy-frontend-results.json'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          exit-code: '0'
+
       - name: Upload Trivy scan results
         uses: github/codeql-action/upload-sarif@v4
         if: always() && hashFiles('trivy-frontend-results.sarif') != ''
@@ -253,6 +297,13 @@ jobs:
         with:
           sarif_file: 'trivy-frontend-results.sarif'
           category: 'frontend'
+
+      - name: Upload Trivy JSON results as artifact
+        uses: actions/upload-artifact@v4
+        if: always() && hashFiles('trivy-frontend-results.json') != ''
+        with:
+          name: trivy-frontend-results
+          path: trivy-frontend-results.json
 
       - name: Push Frontend image
         run: |
@@ -302,7 +353,7 @@ jobs:
           cache-to: type=gha,mode=max
           load: true
 
-      - name: Scan Nginx image with Trivy
+      - name: Scan Nginx image with Trivy (SARIF)
         uses: aquasecurity/trivy-action@master
         continue-on-error: true
         with:
@@ -312,6 +363,16 @@ jobs:
           severity: 'CRITICAL,HIGH'
           exit-code: '0'
 
+      - name: Scan Nginx image with Trivy (JSON)
+        uses: aquasecurity/trivy-action@master
+        continue-on-error: true
+        with:
+          image-ref: ${{ env.DOCKER_USERNAME }}/task-manager-nginx:${{ env.IMAGE_TAG }}
+          format: 'json'
+          output: 'trivy-nginx-results.json'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          exit-code: '0'
+
       - name: Upload Trivy scan results
         uses: github/codeql-action/upload-sarif@v4
         if: always() && hashFiles('trivy-nginx-results.sarif') != ''
@@ -319,6 +380,13 @@ jobs:
         with:
           sarif_file: 'trivy-nginx-results.sarif'
           category: 'nginx'
+
+      - name: Upload Trivy JSON results as artifact
+        uses: actions/upload-artifact@v4
+        if: always() && hashFiles('trivy-nginx-results.json') != ''
+        with:
+          name: trivy-nginx-results
+          path: trivy-nginx-results.json
 
       - name: Push Nginx image
         run: |
@@ -337,10 +405,209 @@ jobs:
           name: nginx-artifacts
           path: artifacts/
 
-  # Job 6: Update K8s manifests with new image tags
+  # Job 6: Collect vulnerabilities and send notifications
+  vulnerability-notification:
+    name: Vulnerability Notification
+    needs: [detect-changes, build-auth-service, build-task-service, build-frontend, build-nginx]
+    if: |
+      always() && 
+      needs.detect-changes.outputs.any-change == 'true' &&
+      (needs.build-auth-service.result == 'success' || 
+       needs.build-task-service.result == 'success' || 
+       needs.build-frontend.result == 'success' || 
+       needs.build-nginx.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all Trivy results
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          path: trivy-results/
+
+      - name: Parse vulnerabilities and generate report
+        id: parse-vulns
+        run: |
+          echo "🔍 Parsing Trivy scan results..."
+          
+          # Initialize counters
+          TOTAL_CRITICAL=0
+          TOTAL_HIGH=0
+          TOTAL_MEDIUM=0
+          
+          # Create report file
+          REPORT_FILE="vulnerability-report.md"
+          echo "# 🔒 Security Vulnerability Report" > $REPORT_FILE
+          echo "" >> $REPORT_FILE
+          echo "**Repository:** ${{ github.repository }}" >> $REPORT_FILE
+          echo "**Commit:** ${{ github.sha }}" >> $REPORT_FILE
+          echo "**Branch:** ${{ github.ref_name }}" >> $REPORT_FILE
+          echo "**Scan Date:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $REPORT_FILE
+          echo "" >> $REPORT_FILE
+          echo "---" >> $REPORT_FILE
+          echo "" >> $REPORT_FILE
+          
+          # Process each service's Trivy results
+          for service_dir in trivy-results/trivy-*-results; do
+            if [ -d "$service_dir" ]; then
+              SERVICE_NAME=$(basename "$service_dir" | sed 's/trivy-//;s/-results//')
+              JSON_FILE="$service_dir/trivy-${SERVICE_NAME}-results.json"
+              
+              if [ -f "$JSON_FILE" ]; then
+                echo "Processing $SERVICE_NAME..."
+                
+                # Count vulnerabilities by severity
+                CRITICAL=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' "$JSON_FILE" 2>/dev/null || echo 0)
+                HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' "$JSON_FILE" 2>/dev/null || echo 0)
+                MEDIUM=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' "$JSON_FILE" 2>/dev/null || echo 0)
+                
+                TOTAL_CRITICAL=$((TOTAL_CRITICAL + CRITICAL))
+                TOTAL_HIGH=$((TOTAL_HIGH + HIGH))
+                TOTAL_MEDIUM=$((TOTAL_MEDIUM + MEDIUM))
+                
+                # Add service section to report
+                echo "## 📦 ${SERVICE_NAME^^} Service" >> $REPORT_FILE
+                echo "" >> $REPORT_FILE
+                echo "| Severity | Count |" >> $REPORT_FILE
+                echo "|----------|-------|" >> $REPORT_FILE
+                echo "| 🔴 CRITICAL | $CRITICAL |" >> $REPORT_FILE
+                echo "| 🟠 HIGH | $HIGH |" >> $REPORT_FILE
+                echo "| 🟡 MEDIUM | $MEDIUM |" >> $REPORT_FILE
+                echo "" >> $REPORT_FILE
+                
+                # List CRITICAL vulnerabilities
+                if [ "$CRITICAL" -gt 0 ]; then
+                  echo "### 🔴 Critical Vulnerabilities" >> $REPORT_FILE
+                  echo "" >> $REPORT_FILE
+                  jq -r '.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL") | "- **\(.VulnerabilityID)**: \(.PkgName) (\(.InstalledVersion)) - \(.Title // "No description")"' "$JSON_FILE" 2>/dev/null >> $REPORT_FILE || true
+                  echo "" >> $REPORT_FILE
+                fi
+                
+                # List HIGH vulnerabilities
+                if [ "$HIGH" -gt 0 ]; then
+                  echo "### 🟠 High Vulnerabilities" >> $REPORT_FILE
+                  echo "" >> $REPORT_FILE
+                  jq -r '.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH") | "- **\(.VulnerabilityID)**: \(.PkgName) (\(.InstalledVersion)) - \(.Title // "No description")"' "$JSON_FILE" 2>/dev/null >> $REPORT_FILE || true
+                  echo "" >> $REPORT_FILE
+                fi
+                
+                echo "---" >> $REPORT_FILE
+                echo "" >> $REPORT_FILE
+              fi
+            fi
+          done
+          
+          # Add summary
+          echo "## 📊 Summary" >> $REPORT_FILE
+          echo "" >> $REPORT_FILE
+          echo "**Total Vulnerabilities Found:**" >> $REPORT_FILE
+          echo "- 🔴 Critical: $TOTAL_CRITICAL" >> $REPORT_FILE
+          echo "- 🟠 High: $TOTAL_HIGH" >> $REPORT_FILE
+          echo "- 🟡 Medium: $TOTAL_MEDIUM" >> $REPORT_FILE
+          echo "" >> $REPORT_FILE
+          
+          # Set outputs
+          echo "total_critical=$TOTAL_CRITICAL" >> $GITHUB_OUTPUT
+          echo "total_high=$TOTAL_HIGH" >> $GITHUB_OUTPUT
+          echo "total_medium=$TOTAL_MEDIUM" >> $GITHUB_OUTPUT
+          
+          # Display report
+          cat $REPORT_FILE
+          
+          echo "✅ Vulnerability report generated"
+
+      - name: Send Slack notification
+        if: steps.parse-vulns.outputs.total_critical > 0 || steps.parse-vulns.outputs.total_high > 0
+        continue-on-error: true
+        run: |
+          if [ -z "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+            echo "⚠️  SLACK_WEBHOOK_URL secret not configured. Skipping Slack notification."
+            exit 0
+          fi
+          
+          # Determine severity color
+          if [ "${{ steps.parse-vulns.outputs.total_critical }}" -gt 0 ]; then
+            COLOR="danger"
+            EMOJI="🔴"
+          elif [ "${{ steps.parse-vulns.outputs.total_high }}" -gt 0 ]; then
+            COLOR="warning"
+            EMOJI="🟠"
+          else
+            COLOR="good"
+            EMOJI="🟡"
+          fi
+          
+          # Create Slack message
+          curl -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"attachments\": [
+                {
+                  \"color\": \"$COLOR\",
+                  \"title\": \"$EMOJI Security Vulnerabilities Detected\",
+                  \"text\": \"Security scan found vulnerabilities in *${{ github.repository }}*\",
+                  \"fields\": [
+                    {
+                      \"title\": \"Critical\",
+                      \"value\": \"${{ steps.parse-vulns.outputs.total_critical }}\",
+                      \"short\": true
+                    },
+                    {
+                      \"title\": \"High\",
+                      \"value\": \"${{ steps.parse-vulns.outputs.total_high }}\",
+                      \"short\": true
+                    },
+                    {
+                      \"title\": \"Medium\",
+                      \"value\": \"${{ steps.parse-vulns.outputs.total_medium }}\",
+                      \"short\": true
+                    },
+                    {
+                      \"title\": \"Branch\",
+                      \"value\": \"${{ github.ref_name }}\",
+                      \"short\": true
+                    },
+                    {
+                      \"title\": \"Commit\",
+                      \"value\": \"<${{ github.event.repository.html_url }}/commit/${{ github.sha }}|${{ github.sha }}>\",
+                      \"short\": false
+                    }
+                  ],
+                  \"footer\": \"GitHub Actions\",
+                  \"footer_icon\": \"https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png\",
+                  \"ts\": $(date +%s)
+                }
+              ]
+            }"
+          
+          echo "✅ Slack notification sent"
+
+      - name: Send email notification
+        if: steps.parse-vulns.outputs.total_critical > 0 || steps.parse-vulns.outputs.total_high > 0
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: ${{ secrets.MAIL_PORT || '587' }}
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "🔒 Security Alert: Vulnerabilities in ${{ github.repository }}"
+          to: ${{ secrets.MAIL_TO }}
+          from: ${{ secrets.MAIL_FROM || secrets.MAIL_USERNAME }}
+          body: file://vulnerability-report.md
+          convert_markdown: true
+          priority: high
+
+      - name: Upload vulnerability report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vulnerability-report
+          path: vulnerability-report.md
+
+  # Job 7: Update K8s manifests with new image tags
   update-k8s-manifests:
     name: Update K8s Manifests
-    needs: [detect-changes, build-auth-service, build-task-service, build-frontend, build-nginx]
+    needs: [detect-changes, build-auth-service, build-task-service, build-frontend, build-nginx, vulnerability-notification]
     if: |
       always() && 
       needs.detect-changes.outputs.any-change == 'true' &&
@@ -415,10 +682,10 @@ jobs:
             echo "✅ K8s manifests updated and pushed"
           fi
 
-  # Job 7: Create summary
+  # Job 8: Create summary
   pipeline-summary:
     name: Pipeline Summary
-    needs: [detect-changes, build-auth-service, build-task-service, build-frontend, build-nginx, update-k8s-manifests]
+    needs: [detect-changes, build-auth-service, build-task-service, build-frontend, build-nginx, vulnerability-notification, update-k8s-manifests]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -438,7 +705,10 @@ jobs:
           echo "- Frontend: ${{ needs.build-frontend.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- Nginx: ${{ needs.build-nginx.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## 📦 K8s Manifest Update" >> $GITHUB_STEP_SUMMARY
+          echo "## � Security Scan" >> $GITHUB_STEP_SUMMARY
+          echo "- Vulnerability Check: ${{ needs.vulnerability-notification.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## �📦 K8s Manifest Update" >> $GITHUB_STEP_SUMMARY
           echo "- Status: ${{ needs.update-k8s-manifests.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## 📋 Image Tags" >> $GITHUB_STEP_SUMMARY
