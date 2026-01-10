@@ -1,15 +1,23 @@
 name: CI/CD Pipeline - Service Change Detection
 
+# Triggers on changes to service directories or this workflow file
+# Note: Dockerfile changes will trigger builds since they require image rebuilds
 on:
   push:
     branches: [master, develop]
     paths:
-      - 'services/**'
-      - '.github/workflows/**'
+      - 'services/auth-service/**'
+      - 'services/task-service/**'
+      - 'services/frontend/**'
+      - 'services/nginx/**'
+      - '.github/workflows/ci-cd-pipeline.yml'
   pull_request:
     branches: [master, develop]
     paths:
-      - 'services/**'
+      - 'services/auth-service/**'
+      - 'services/task-service/**'
+      - 'services/frontend/**'
+      - 'services/nginx/**'
 
 permissions:
   contents: write
