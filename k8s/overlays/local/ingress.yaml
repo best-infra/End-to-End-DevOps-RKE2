@@ -10,7 +10,22 @@ spec:
   rules:
     - http:
         paths:
-          # API routes with rewrite
+          # API routes (most specific first)
+          - path: /api/auth(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: auth-service
+                port:
+                  number: 80
+          - path: /api/tasks(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: task-service
+                port:
+                  number: 80
+          # Legacy /pages routes
           - path: /pages/logout.php
             pathType: Exact
             backend:
