@@ -111,6 +111,23 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           load: true
+          provenance: true
+          sbom: true
+
+      - name: Generate SBOM for Auth Service
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.DOCKER_USERNAME }}/task-manager-auth:${{ env.IMAGE_TAG }}
+          format: spdx-json
+          output-file: auth-sbom.spdx.json
+
+      - name: Scan Auth Service SBOM with Grype
+        uses: anchore/scan-action@v3
+        continue-on-error: true
+        with:
+          sbom: auth-sbom.spdx.json
+          fail-build: false
+          severity-cutoff: high
 
       - name: Scan Auth Service image with Trivy (SARIF)
         uses: aquasecurity/trivy-action@master
@@ -146,6 +163,28 @@ jobs:
         with:
           name: trivy-auth-results
           path: trivy-auth-results.json
+
+      - name: Scan for secrets in Auth Service
+        uses: aquasecurity/trivy-action@master
+        continue-on-error: true
+        with:
+          scan-type: 'fs'
+          scan-ref: './services/auth-service'
+          scanners: 'secret'
+          format: 'table'
+
+      - name: Check Auth Service image for security best practices
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy image --security-checks config \
+            ${{ env.DOCKER_USERNAME }}/task-manager-auth:${{ env.IMAGE_TAG }}
+
+      - name: Upload Auth Service SBOM
+        uses: actions/upload-artifact@v4
+        if: always() && hashFiles('auth-sbom.spdx.json') != ''
+        with:
+          name: auth-sbom
+          path: auth-sbom.spdx.json
 
       - name: Push Auth Service image
         run: |

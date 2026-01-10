@@ -1209,15 +1209,99 @@ Database user permissions should follow the principle of least privilege. Applic
 
 ### CI/CD Security
 
-GitHub Actions workflows use secrets to store credentials. These secrets are encrypted by GitHub and only exposed to workflow runners. Access to repository secrets should be restricted to administrators.
+**Multi-Layer Scanning**: The CI/CD pipeline implements comprehensive security scanning at multiple stages:
 
-Container image builds run in isolated runners without access to production infrastructure. Images are scanned before being pushed to registries. SARIF scan results are uploaded to GitHub Security for tracking and alerting.
+1. **Trivy Vulnerability Scanning**: Scans images for CVE vulnerabilities (CRITICAL, HIGH, MEDIUM severity levels)
+2. **SBOM Generation**: Creates Software Bill of Materials (SBOM) in SPDX-JSON format for supply chain transparency
+3. **Grype Scanning**: Analyzes SBOM for known vulnerabilities in dependencies
+4. **Secret Scanning**: Detects hardcoded secrets in source code before image build
+5. **Configuration Scanning**: Validates container security best practices
+
+**Build Security Features**:
+- **Provenance Attestation**: BuildKit provenance enabled to verify build authenticity
+- **SBOM Artifacts**: Generated for every image to track all dependencies
+- **Scan Reports**: SARIF format uploaded to GitHub Security, JSON format for parsing and alerting
+- **Build Isolation**: Workflows run in ephemeral runners with no production access
+
+**Workflow Security**:
+- GitHub Actions secrets are encrypted and restricted to administrators
+- Dependency pinning with hash verification (uses/actions@v5.0.0)
+- Minimal workflow permissions (contents: read, security-events: write)
+- No hardcoded credentials in workflow files
+
+### Kubernetes Security
+
+**Network Policies**: Zero-trust networking with default-deny rules:
+- Default deny-all ingress and egress traffic
+- Frontend: Only accepts traffic from ingress-nginx, only connects to auth/task services
+- Auth/Task Services: Only accepts traffic from frontend/ingress, only connects to MySQL
+- MySQL: Only accepts traffic from auth/task services, no external connections
+- DNS: Explicitly allowed for all pods that need external resolution
+
+**RBAC (Role-Based Access Control)**:
+- Dedicated service accounts for each service (frontend-sa, auth-service-sa, task-service-sa, mysql-sa)
+- Least-privilege access: Only auth/task services can read secrets
+- Role bindings limit secret access to specific secret names (tms-app-secrets only)
+- Frontend service account has no secret access (runs static nginx)
+
+**Pod Security**:
+```yaml
+securityContext:
+  runAsNonRoot: true             # Prevents root execution
+  runAsUser: 1000                # Specific non-privileged UID
+  fsGroup: 1000                  # File system group ownership
+  seccompProfile:
+    type: RuntimeDefault         # Secure computing mode restrictions
+  allowPrivilegeEscalation: false # Prevents gaining additional privileges
+  readOnlyRootFilesystem: true    # Immutable container filesystem (where possible)
+  capabilities:
+    drop: [ALL]                   # Drop all Linux capabilities by default
+    add: [NET_BIND_SERVICE]       # Only add required capabilities (nginx port 80)
+```
+
+**Resource Protection**:
+- CPU and memory requests/limits defined for all pods
+- Prevents resource exhaustion attacks
+- Enables fair resource distribution
+- PodDisruptionBudgets ensure minimum 1 replica during voluntary disruptions
+
+**Health Monitoring**:
+- Liveness probes: Restart unhealthy pods automatically
+- Readiness probes: Remove pods from load balancer when not ready
+- Health check endpoints: /health for auth (8001) and task (8002) services
+- MySQL probes: mysqladmin ping with appropriate thresholds
 
 ### Ingress Security
 
 The ingress controller terminates HTTP traffic. For production deployments, configure TLS certificates to enable HTTPS. Let's Encrypt can provide free automated certificates using cert-manager.
 
 Rate limiting should be configured on the ingress controller to prevent denial of service attacks. Authentication can be required at the ingress level using basic auth or OAuth2 proxies.
+
+**Production TLS Configuration**:
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+    nginx.ingress.kubernetes.io/limit-connections: "5"
+spec:
+  tls:
+  - hosts:
+    - yourdomain.com
+    secretName: tms-tls-cert
+```
+
+### Comprehensive Security Documentation
+
+For complete security implementation details, see [SECURITY_IMPLEMENTATION.md](./SECURITY_IMPLEMENTATION.md):
+- All security layers (CI/CD, Container, Kubernetes, Network, Application)
+- Security testing procedures
+- Compliance standards (CIS, OWASP, PCI DSS, GDPR)
+- Incident response procedures
+- Security checklist and audit trail
+- Continuous improvement metrics
 
 ## Best Practices
 

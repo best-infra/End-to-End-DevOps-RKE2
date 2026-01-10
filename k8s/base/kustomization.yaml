@@ -5,6 +5,9 @@ namespace: tms-app
 
 resources:
   - namespace.yaml
+  - rbac.yaml
+  - network-policy.yaml
+  - pdb.yaml
   - frontend-deployment.yaml
   - frontend-service.yaml
   - users-deployment.yaml
