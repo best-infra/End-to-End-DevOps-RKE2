@@ -25,19 +25,23 @@ spec:
   - from:
     - namespaceSelector:
         matchLabels:
-          name: ingress-nginx
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: rke2-ingress-nginx
     ports:
     - protocol: TCP
       port: 80
   egress:
-  # Allow DNS
+  # Allow DNS (CoreDNS is in kube-system namespace)
   - to:
-    - namespaceSelector: {}
-      podSelector:
+    - namespaceSelector:
         matchLabels:
-          k8s-app: kube-dns
+          kubernetes.io/metadata.name: kube-system
     ports:
     - protocol: UDP
+      port: 53
+    - protocol: TCP
       port: 53
   # Allow connection to auth and task services
   - to:
@@ -80,19 +84,23 @@ spec:
   - from:
     - namespaceSelector:
         matchLabels:
-          name: ingress-nginx
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: rke2-ingress-nginx
     ports:
     - protocol: TCP
       port: 8001
   egress:
-  # Allow DNS
+  # Allow DNS (CoreDNS is in kube-system namespace)
   - to:
-    - namespaceSelector: {}
-      podSelector:
+    - namespaceSelector:
         matchLabels:
-          k8s-app: kube-dns
+          kubernetes.io/metadata.name: kube-system
     ports:
     - protocol: UDP
+      port: 53
+    - protocol: TCP
       port: 53
   # Allow connection to MySQL
   - to:
@@ -128,19 +136,23 @@ spec:
   - from:
     - namespaceSelector:
         matchLabels:
-          name: ingress-nginx
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: rke2-ingress-nginx
     ports:
     - protocol: TCP
       port: 8002
   egress:
-  # Allow DNS
+  # Allow DNS (CoreDNS is in kube-system namespace)
   - to:
-    - namespaceSelector: {}
-      podSelector:
+    - namespaceSelector:
         matchLabels:
-          k8s-app: kube-dns
+          kubernetes.io/metadata.name: kube-system
     ports:
     - protocol: UDP
+      port: 53
+    - protocol: TCP
       port: 53
   # Allow connection to MySQL
   - to:
@@ -176,12 +188,13 @@ spec:
     - protocol: TCP
       port: 3306
   egress:
-  # Allow DNS
+  # Allow DNS (CoreDNS is in kube-system namespace)
   - to:
-    - namespaceSelector: {}
-      podSelector:
+    - namespaceSelector:
         matchLabels:
-          k8s-app: kube-dns
+          kubernetes.io/metadata.name: kube-system
     ports:
     - protocol: UDP
+      port: 53
+    - protocol: TCP
       port: 53
