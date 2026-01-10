@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: khaledhawil/task-manager-frontend:b9b17489966beb2d1b64b6d0bbddfce6bb210777
+          image: khaledhawil/task-manager-frontend:15484888ff49080745de7a26ebd4a4db26aa1efa
           imagePullPolicy: Always
           ports:
             - containerPort: 80
