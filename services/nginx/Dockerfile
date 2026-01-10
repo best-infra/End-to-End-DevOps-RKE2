@@ -1,4 +1,7 @@
-FROM nginx:alpine
+FROM nginx:1.25-alpine3.19
+
+# Install security updates
+RUN apk update && apk upgrade --no-cache
 
 # Remove default nginx config
 RUN rm /etc/nginx/conf.d/default.conf
