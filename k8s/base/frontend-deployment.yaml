@@ -22,7 +22,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: frontend
-          image: khaledhawil/task-manager-frontend:ec9cc2f33d1806b672e9a42c203af28b9692cebd
+          image: khaledhawil/task-manager-frontend:1.0.14
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
