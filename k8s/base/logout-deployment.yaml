@@ -33,7 +33,7 @@ spec:
               drop:
                 - ALL
           ports:
-            - containerPort: 80
+            - containerPort: 8002
               protocol: TCP
           resources:
             requests:
