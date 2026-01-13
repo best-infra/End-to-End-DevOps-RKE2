@@ -141,9 +141,9 @@ def create_task():
 @app.route('/api/tasks/<int:task_id>', methods=['DELETE'])
 @verify_token
 def delete_task(task_id):
-    try:pool = get_connection_pool()
-        conn = 
-        conn = connection_pool.get_connection()
+    try:
+        pool = get_connection_pool()
+        conn = pool.get_connection()
         cursor = conn.cursor()
         
         cursor.execute(
@@ -177,9 +177,9 @@ def update_task(task_id):
     if not title or not description:
         return jsonify({"error": "Title and description required"}), 400
     
-    try:pool = get_connection_pool()
-        conn = 
-        conn = connection_pool.get_connection()
+    try:
+        pool = get_connection_pool()
+        conn = pool.get_connection()
         cursor = conn.cursor()
         
         query = "UPDATE tasks SET title = %s, description = %s"
