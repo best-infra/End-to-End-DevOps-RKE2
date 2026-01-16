@@ -13,7 +13,7 @@ spec:
   timeout: 10m0s
   wait: true
   healthChecks:
-    - apiVersion: helm.toolkit.fluxcd.io/v2beta1
+    - apiVersion: helm.toolkit.fluxcd.io/v2
       kind: HelmRelease
       name: kube-prometheus-stack
       namespace: monitoring
