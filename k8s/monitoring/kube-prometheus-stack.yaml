@@ -43,6 +43,7 @@ spec:
       adminPassword: admin123
       persistence:
         enabled: true
+        storageClassName: local-path
         size: 5Gi
       resources:
         requests:
