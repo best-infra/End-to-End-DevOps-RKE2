@@ -10,11 +10,10 @@ resources:
   - pdb.yaml
   - frontend-deployment.yaml
   - frontend-service.yaml
-  - users-deployment.yaml
-  - users-service.yaml
-  - logout-deployment.yaml
-  - logout-service.yaml
+  - auth-service-deployment.yaml
+  - auth-service.yaml
   - task-service-deployment.yaml
+  - task-service.yaml
   - mysql-configmap.yaml
 
 # Note: commonLabels removed because it adds labels to NetworkPolicy selectors,

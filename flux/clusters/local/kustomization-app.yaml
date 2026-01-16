@@ -20,11 +20,11 @@ spec:
       namespace: tms-app
     - apiVersion: apps/v1
       kind: Deployment
-      name: users-service
+      name: auth-service
       namespace: tms-app
     - apiVersion: apps/v1
       kind: Deployment
-      name: logout-service
+      name: task-service
       namespace: tms-app
     - apiVersion: apps/v1
       kind: Deployment

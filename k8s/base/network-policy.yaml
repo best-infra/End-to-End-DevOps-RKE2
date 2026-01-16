@@ -22,7 +22,6 @@ spec:
   - Ingress
   - Egress
   ingress:
-  # Allow from ingress controller
   - from:
     - namespaceSelector:
         matchLabels:
@@ -31,7 +30,6 @@ spec:
     - protocol: TCP
       port: 80
   egress:
-  # Allow DNS
   - to:
     - namespaceSelector:
         matchLabels:
@@ -41,7 +39,6 @@ spec:
       port: 53
     - protocol: TCP
       port: 53
-  # Allow all internal pod communication (frontend needs to reach APIs)
   - to:
     - podSelector: {}
     ports:
@@ -60,12 +57,11 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app: users-service
+      app: auth-service
   policyTypes:
   - Ingress
   - Egress
   ingress:
-  # Allow from frontend
   - from:
     - podSelector:
         matchLabels:
@@ -73,7 +69,6 @@ spec:
     ports:
     - protocol: TCP
       port: 8001
-  # Allow from ingress controller
   - from:
     - namespaceSelector:
         matchLabels:
@@ -84,7 +79,6 @@ spec:
     - protocol: TCP
       port: 8001
   egress:
-  # Allow DNS
   - to:
     - namespaceSelector:
         matchLabels:
@@ -94,7 +88,6 @@ spec:
       port: 53
     - protocol: TCP
       port: 53
-  # Allow connection to MySQL
   - to:
     - podSelector:
         matchLabels:
@@ -116,7 +109,6 @@ spec:
   - Ingress
   - Egress
   ingress:
-  # Allow from frontend
   - from:
     - podSelector:
         matchLabels:
@@ -124,7 +116,6 @@ spec:
     ports:
     - protocol: TCP
       port: 8002
-  # Allow from ingress controller
   - from:
     - namespaceSelector:
         matchLabels:
@@ -135,7 +126,6 @@ spec:
     - protocol: TCP
       port: 8002
   egress:
-  # Allow DNS
   - to:
     - namespaceSelector:
         matchLabels:
@@ -145,7 +135,6 @@ spec:
       port: 53
     - protocol: TCP
       port: 53
-  # Allow connection to MySQL
   - to:
     - podSelector:
         matchLabels:
@@ -167,14 +156,10 @@ spec:
   - Ingress
   - Egress
   ingress:
-  # Only allow from auth and task services
   - from:
     - podSelector:
         matchLabels:
-          app: users-service
-    - podSelector:
-        matchLabels:
-          app: logout-service
+          app: auth-service
     - podSelector:
         matchLabels:
           app: task-service
@@ -182,7 +167,6 @@ spec:
     - protocol: TCP
       port: 3306
   egress:
-  # Allow DNS (CoreDNS is in kube-system namespace)
   - to:
     - namespaceSelector:
         matchLabels:

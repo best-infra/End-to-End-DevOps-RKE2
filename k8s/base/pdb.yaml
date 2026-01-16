@@ -18,7 +18,7 @@ spec:
   minAvailable: 1
   selector:
     matchLabels:
-      app: users-service
+      app: auth-service
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
@@ -29,4 +29,4 @@ spec:
   minAvailable: 1
   selector:
     matchLabels:
-      app: logout-service
+      app: task-service

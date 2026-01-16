@@ -1,17 +1,17 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: users-service
+  name: auth-service
   namespace: tms-app
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: users-service
+      app: auth-service
   template:
     metadata:
       labels:
-        app: users-service
+        app: auth-service
     spec:
       serviceAccountName: auth-service-sa
       securityContext:
@@ -21,7 +21,7 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: users-service
+        - name: auth-service
           image: khaledhawil/task-manager-task:latest
           imagePullPolicy: Always
           securityContext:
@@ -33,7 +33,7 @@ spec:
               drop:
                 - ALL
           ports:
-            - containerPort: 8000
+            - containerPort: 8001
               protocol: TCP
           resources:
             requests:
@@ -45,7 +45,7 @@ spec:
           livenessProbe:
             httpGet:
               path: /health
-              port: 8000
+              port: 8001
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
@@ -53,7 +53,7 @@ spec:
           readinessProbe:
             httpGet:
               path: /health
-              port: 8000
+              port: 8001
             initialDelaySeconds: 10
             periodSeconds: 5
             timeoutSeconds: 3
@@ -84,10 +84,7 @@ spec:
                 secretKeyRef:
                   name: db-name
                   key: name
-            - name: DB_DATABASE
-              valueFrom:
-                secretKeyRef:
-                  name: db-name
-                  key: name
             - name: DB_PORT
               value: "3306"
+            - name: JWT_SECRET
+              value: "your-secret-key-change-in-production"
