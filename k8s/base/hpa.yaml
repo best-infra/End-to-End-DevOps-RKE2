@@ -36,7 +36,7 @@ spec:
           periodSeconds: 60
       selectPolicy: Min
     scaleUp:
-      stabilizationWindowSeconds: 0
+      stabilizationWindowSeconds: 60  # Changed from 0 to 60 seconds
       policies:
         - type: Percent
           value: 100
@@ -57,7 +57,7 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: auth-service
-  minReplicas: 2
+  minReplicas: 1  # Changed from 2 to 1
   maxReplicas: 10
   metrics:
     - type: Resource
@@ -78,13 +78,13 @@ spec:
       policies:
         - type: Percent
           value: 50
-          periodSeconds: 60
+          periodSeconds: 120  # Changed from 60 to 120 seconds
         - type: Pods
           value: 1
-          periodSeconds: 60
+          periodSeconds: 120  # Changed from 60 to 120 seconds
       selectPolicy: Min
     scaleUp:
-      stabilizationWindowSeconds: 0
+      stabilizationWindowSeconds: 60  # Changed from 0 to 60 seconds
       policies:
         - type: Percent
           value: 100
@@ -105,7 +105,7 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: task-service
-  minReplicas: 2
+  minReplicas: 1  # Changed from 2 to 1
   maxReplicas: 10
   metrics:
     - type: Resource
@@ -126,13 +126,13 @@ spec:
       policies:
         - type: Percent
           value: 50
-          periodSeconds: 60
+          periodSeconds: 120  # Changed from 60 to 120 seconds
         - type: Pods
           value: 1
-          periodSeconds: 60
+          periodSeconds: 120  # Changed from 60 to 120 seconds
       selectPolicy: Min
     scaleUp:
-      stabilizationWindowSeconds: 0
+      stabilizationWindowSeconds: 60  # Changed from 0 to 60 seconds
       policies:
         - type: Percent
           value: 100
