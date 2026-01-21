@@ -12,6 +12,9 @@ require('dotenv').config()
 const app = express()
 const PORT = process.env.PORT || 8001
 
+// Trust proxy - required for rate limiting behind ingress/nginx
+app.set('trust proxy', 1)
+
 // CI/CD Pipeline Full Test - January 2026 v1.0.0 // // 
 // This service now includes automated builds and security scanning
 // Testing multi-service deployment
