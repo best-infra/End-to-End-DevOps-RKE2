@@ -820,7 +820,7 @@ jobs:
       - name: Send email notification
         if: steps.parse-vulns.outputs.total_critical > 0 || steps.parse-vulns.outputs.total_high > 0
         continue-on-error: true
-        uses: dawidd6/action-send-mail@v3
+        uses: dawidd6/action-send-mail@v7
         with:
           server_address: ${{ secrets.MAIL_SERVER }}
           server_port: ${{ secrets.MAIL_PORT || '587' }}
