@@ -1,75 +1,188 @@
-# Task Management System
+# Task Management System - End-to-End DevOps Project
 
-A production-grade, cloud-native task management application demonstrating modern DevOps practices. This project implements a complete end-to-end pipeline from development to production deployment using containerization, Kubernetes orchestration, GitOps workflows, and comprehensive security hardening.
+A production-grade, cloud-native task management application demonstrating modern DevOps practices with complete CI/CD automation, Kubernetes orchestration, GitOps workflows, and security hardening.
 
 ---
 
 ## Table of Contents
 
-1. [Architecture Overview](#architecture-overview)
-2. [Technology Stack](#technology-stack)
-3. [Project Structure](#project-structure)
-4. [Services](#services)
-5. [Infrastructure](#infrastructure)
-6. [CI/CD Pipeline](#cicd-pipeline)
+1. [Project Overview](#project-overview)
+2. [Architecture](#architecture)
+3. [Technology Stack](#technology-stack)
+4. [Project Structure](#project-structure)
+5. [DevOps Workflow](#devops-workflow)
+6. [Step-by-Step Setup Guide](#step-by-step-setup-guide)
+   - [Phase 1: Local Development](#phase-1-local-development)
+   - [Phase 2: Kubernetes Cluster Setup](#phase-2-kubernetes-cluster-setup)
+   - [Phase 3: GitOps with Flux CD](#phase-3-gitops-with-flux-cd)
+   - [Phase 4: CI/CD Pipeline](#phase-4-cicd-pipeline)
+   - [Phase 5: Monitoring Stack](#phase-5-monitoring-stack)
 7. [Security Implementation](#security-implementation)
-8. [Monitoring and Observability](#monitoring-and-observability)
-9. [Local Development](#local-development)
-10. [Kubernetes Deployment](#kubernetes-deployment)
-11. [Environment Configuration](#environment-configuration)
-12. [API Reference](#api-reference)
-13. [Troubleshooting](#troubleshooting)
+8. [Troubleshooting](#troubleshooting)
 
 ---
 
-## Architecture Overview
+## Project Overview
 
-The system follows a microservices architecture pattern with the following components:
+This project demonstrates a complete DevOps lifecycle for a microservices-based task management application. It covers:
+
+- Containerized microservices (Node.js, Python, React)
+- Kubernetes deployment on RKE2 cluster
+- GitOps continuous deployment with Flux CD
+- CI/CD automation with GitHub Actions
+- Monitoring with Prometheus and Grafana
+- Security hardening at application and infrastructure levels
+
+---
+
+## Architecture
+
+### High-Level System Architecture
 
 ```
-                                    [Ingress Controller]
-                                           |
-                    +----------------------+----------------------+
-                    |                      |                      |
-              [Frontend]            [Auth Service]         [Task Service]
-                    |                      |                      |
-                    +----------------------+----------------------+
-                                           |
-                                       [MySQL]
++-----------------------------------------------------------------------------------+
+|                              DEVELOPER WORKSTATION                                |
+|   [Code Changes] --> [Git Push] --> [GitHub Repository]                          |
++-----------------------------------------------------------------------------------+
+                                        |
+                                        v
++-----------------------------------------------------------------------------------+
+|                              CI/CD PIPELINE (GitHub Actions)                       |
+|                                                                                   |
+|   +-------------+    +---------------+    +---------------+    +---------------+ |
+|   | Detect      |--->| Security Scan |--->| Docker Build  |--->| Update K8s    | |
+|   | Changes     |    | (Trivy)       |    | & Push        |    | Manifests     | |
+|   +-------------+    +---------------+    +---------------+    +---------------+ |
+|                                                                        |          |
++------------------------------------------------------------------------|----------+
+                                                                         |
+                                                                         v
++-----------------------------------------------------------------------------------+
+|                              KUBERNETES CLUSTER (RKE2)                            |
+|                                                                                   |
+|   +-------------+         +-------------------------------------------------+    |
+|   | Flux CD     |-------->|                 tms-app Namespace               |    |
+|   | Controller  |         |                                                 |    |
+|   +-------------+         |   +----------+  +-------------+  +------------+ |    |
+|                           |   | Frontend |  | Auth Service|  | Task Svc   | |    |
+|                           |   | (React)  |  | (Node.js)   |  | (Python)   | |    |
+|                           |   +----------+  +-------------+  +------------+ |    |
+|                           |        |              |               |         |    |
+|                           |        v              v               v         |    |
+|                           |   +----------------------------------------+    |    |
+|                           |   |              MySQL Database            |    |    |
+|                           |   +----------------------------------------+    |    |
+|                           +-------------------------------------------------+    |
+|                                                                                   |
+|   +-------------+         +-------------------------------------------------+    |
+|   | Prometheus  |-------->|             monitoring Namespace                |    |
+|   | Operator    |         |   +----------+  +-------------+  +------------+ |    |
+|                           |   | Prometheus|  | Grafana     |  | Alert Mgr  | |    |
+|                           |   +----------+  +-------------+  +------------+ |    |
+|                           +-------------------------------------------------+    |
++-----------------------------------------------------------------------------------+
 ```
 
-**Request Flow:**
-1. External traffic enters through the Ingress Controller
-2. Nginx routes requests to appropriate backend services based on path
-3. Authentication requests are handled by the Auth Service (Node.js)
-4. Task operations are processed by the Task Service (Python/Flask)
-5. Both services communicate with a shared MySQL database
-6. JWT tokens are used for stateless authentication between services
+### Microservices Architecture
+
+```
+                              [Ingress Controller]
+                                      |
+                                      | HTTPS/HTTP
+                                      v
+                              +---------------+
+                              |    Nginx      |
+                              | (Reverse Proxy)|
+                              +-------+-------+
+                                      |
+           +--------------------------|---------------------------+
+           |                          |                           |
+           v                          v                           v
+   +---------------+          +---------------+           +---------------+
+   |   Frontend    |          | Auth Service  |           | Task Service  |
+   |   (React)     |          |  (Node.js)    |           |   (Python)    |
+   |               |          |               |           |               |
+   | Port: 80      |          | Port: 8001    |           | Port: 8002    |
+   +---------------+          +-------+-------+           +-------+-------+
+                                      |                           |
+                                      |        JWT Tokens         |
+                                      +-------------+-------------+
+                                                    |
+                                                    v
+                                            +---------------+
+                                            |    MySQL      |
+                                            |   Database    |
+                                            |               |
+                                            | Port: 3306    |
+                                            +---------------+
+```
+
+### CI/CD Pipeline Flow
+
+```
++--------+     +----------+     +----------+     +----------+     +----------+
+| Code   |---->| GitHub   |---->| GitHub   |---->| Docker   |---->| Flux CD  |
+| Commit |     | Repo     |     | Actions  |     | Registry |     | Sync     |
++--------+     +----------+     +----------+     +----------+     +----------+
+                                     |                                  |
+                                     v                                  v
+                               +----------+                       +----------+
+                               | Trivy    |                       | K8s      |
+                               | Security |                       | Cluster  |
+                               | Scan     |                       | Deploy   |
+                               +----------+                       +----------+
+```
+
+### Kubernetes Cluster Architecture
+
+```
+                    +------------------------------------------+
+                    |           RKE2 Kubernetes Cluster        |
+                    +------------------------------------------+
+                    |                                          |
+    +---------------+------------------+-------------------+   |
+    |               |                  |                   |   |
++---v----+     +----v-----+      +-----v------+           |   |
+| Master |     | Worker 1 |      | Worker 2   |           |   |
+| Node   |     | Node     |      | Node       |           |   |
+|        |     |          |      |            |           |   |
+| - API  |     | - Pods   |      | - Pods     |           |   |
+| - etcd |     | - Kubelet|      | - Kubelet  |           |   |
+| - Ctrl |     |          |      |            |           |   |
++--------+     +----------+      +------------+           |   |
+                    |                                          |
+                    +------------------------------------------+
+```
 
 ---
 
 ## Technology Stack
 
 ### Application Layer
-| Component | Technology | Version |
-|-----------|------------|---------|
-| Frontend | React with Vite | 5.x |
-| Auth Service | Node.js with Express | 22.x |
-| Task Service | Python with Flask | 3.12 |
-| Database | MySQL | 8.0 |
-| Reverse Proxy | Nginx | 1.27 |
 
-### Infrastructure Layer
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| Container Runtime | Docker | Application containerization |
-| Orchestration | Kubernetes (RKE2) | Container orchestration |
-| GitOps | Flux CD | Continuous deployment |
-| CI/CD | GitHub Actions | Continuous integration |
-| Monitoring | Prometheus + Grafana | Metrics and visualization |
-| Security Scanning | Trivy | Vulnerability detection |
+| Service | Technology | Version | Purpose |
+|---------|------------|---------|---------|
+| Frontend | React + Vite | 5.x | User interface |
+| Auth Service | Node.js + Express | 22.x | Authentication and authorization |
+| Task Service | Python + Flask | 3.12 | Task CRUD operations |
+| Database | MySQL | 8.0 | Data persistence |
+| Reverse Proxy | Nginx | 1.27 | Request routing |
+
+### DevOps Tools
+
+| Tool | Purpose | Version |
+|------|---------|---------|
+| Docker | Container runtime | Latest |
+| Kubernetes | Container orchestration | RKE2 |
+| Flux CD | GitOps continuous deployment | v2 |
+| GitHub Actions | CI/CD automation | - |
+| Prometheus | Metrics collection | Latest |
+| Grafana | Metrics visualization | Latest |
+| Trivy | Security scanning | Latest |
+| Helm | Kubernetes package manager | v3 |
 
 ### Security Components
+
 | Component | Purpose |
 |-----------|---------|
 | Helmet | HTTP security headers |
@@ -79,6 +192,8 @@ The system follows a microservices architecture pattern with the following compo
 | Pydantic | Input validation (Python) |
 | bcrypt | Password hashing |
 | JWT | Stateless authentication |
+| NetworkPolicy | Pod network isolation |
+| RBAC | Kubernetes access control |
 
 ---
 
@@ -88,554 +203,559 @@ The system follows a microservices architecture pattern with the following compo
 .
 ├── .github/
 │   ├── workflows/
-│   │   ├── ci-cd-pipeline.yml      # Main CI/CD pipeline
-│   │   └── monthly-updates.yml      # Dependency update automation
-│   └── dependabot.yml               # Automated dependency updates
+│   │   ├── ci-cd-pipeline.yml       # Main CI/CD pipeline (1132 lines)
+│   │   └── monthly-updates.yml      # Automated dependency updates
+│   └── dependabot.yml               # Dependabot configuration
+│
 ├── flux/
 │   └── clusters/
-│       ├── local/                   # Local environment Flux config
-│       ├── staging/                 # Staging environment Flux config
-│       └── production/              # Production environment Flux config
+│       ├── local/
+│       │   ├── git-repository.yaml  # Git source for Flux
+│       │   ├── kustomization-app.yaml
+│       │   ├── kustomization-monitoring.yaml
+│       │   └── weave-gitops-dashboard.yaml
+│       ├── staging/
+│       └── production/
+│
 ├── k8s/
 │   ├── base/                        # Base Kubernetes manifests
-│   ├── monitoring/                  # Prometheus/Grafana stack
+│   │   ├── namespace.yaml
+│   │   ├── rbac.yaml                # Service accounts and roles
+│   │   ├── network-policy.yaml      # Network isolation rules
+│   │   ├── pdb.yaml                 # Pod disruption budgets
+│   │   ├── hpa.yaml                 # Horizontal pod autoscalers
+│   │   ├── frontend-deployment.yaml
+│   │   ├── auth-service-deployment.yaml
+│   │   ├── task-service-deployment.yaml
+│   │   └── kustomization.yaml
+│   ├── monitoring/
+│   │   ├── namespace.yaml
+│   │   ├── helm-repo.yaml
+│   │   ├── kube-prometheus-stack.yaml
+│   │   └── service-monitors.yaml
 │   └── overlays/
-│       ├── local/                   # Local environment overrides
-│       ├── staging/                 # Staging environment overrides
-│       └── production/              # Production environment overrides
+│       ├── local/                   # Local environment configs
+│       ├── staging/                 # Staging environment configs
+│       └── production/              # Production environment configs
+│
 ├── services/
 │   ├── auth-service/                # Node.js authentication service
+│   │   ├── Dockerfile
+│   │   ├── package.json
+│   │   └── server.js
 │   ├── task-service/                # Python task management service
+│   │   ├── Dockerfile
+│   │   ├── requirements.txt
+│   │   └── app.py
 │   ├── frontend/                    # React frontend application
+│   │   ├── Dockerfile
+│   │   ├── package.json
+│   │   └── src/
 │   ├── nginx/                       # Nginx reverse proxy
-│   └── docker-compose.yml           # Local development composition
-└── scripts/
-    └── monthly-update.sh            # Manual dependency update script
+│   │   ├── Dockerfile
+│   │   └── nginx.conf
+│   └── docker-compose.yml           # Local development
+│
+├── scripts/
+│   └── monthly-update.sh            # Manual update script
+│
+├── Screenshots/                     # Project screenshots
+│   ├── Grafana.png
+│   ├── app-on-weavy.png
+│   ├── cd-pipline.png
+│   ├── k8s-cluster.png
+│   ├── pipline-summary.png
+│   ├── slack-.png
+│   ├── task-app.png
+│   └── weavy-gui.png
+│
+├── RKE2_cluster.md                  # Cluster setup guide
+├── MONTHLY_UPDATE_CHECKLIST.md      # Maintenance guide
+└── README.md                        # This file
 ```
 
 ---
 
-## Services
+## DevOps Workflow
 
-### Auth Service (Node.js/Express)
+### Complete DevOps Lifecycle
 
-Handles user authentication and authorization.
-
-**Endpoints:**
-| Method | Path | Description | Rate Limit |
-|--------|------|-------------|------------|
-| POST | /register | User registration | 3/hour |
-| POST | /login | User authentication | 5/15min |
-| GET | /health | Health check | Unlimited |
-
-**Security Features:**
-- Password complexity requirements (12+ characters, mixed case, numbers, symbols)
-- Bcrypt password hashing with salt rounds
-- JWT token generation with configurable expiry
-- Rate limiting to prevent brute force attacks
-- Input validation on all endpoints
-- Security headers via Helmet middleware
-
-### Task Service (Python/Flask)
-
-Manages task CRUD operations.
-
-**Endpoints:**
-| Method | Path | Description | Rate Limit |
-|--------|------|-------------|------------|
-| GET | /tasks | List user tasks | 100/15min |
-| POST | /tasks | Create new task | 20/min |
-| PUT | /tasks/{id} | Update task | 100/15min |
-| DELETE | /tasks/{id} | Delete task | 100/15min |
-| GET | /health | Health check | Unlimited |
-
-**Security Features:**
-- JWT token validation on protected routes
-- Pydantic models for request validation
-- Rate limiting via Flask-Limiter
-- SQL injection prevention via parameterized queries
-
-### Frontend (React/Vite)
-
-Single-page application for user interaction.
-
-**Features:**
-- Modern React with hooks
-- Real-time password strength indicator
-- JWT token management
-- Responsive design
-- Production build optimization via Vite
+```
+┌────────────────────────────────────────────────────────────────────────────────┐
+│                            DevOps Lifecycle                                     │
+├────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  1. DEVELOP        2. BUILD          3. TEST           4. DEPLOY               │
+│  ┌─────────┐      ┌─────────┐       ┌─────────┐       ┌─────────┐              │
+│  │ Write   │ ──── │ Docker  │ ───── │ Trivy   │ ───── │ Flux CD │              │
+│  │ Code    │ Push │ Build   │       │ Scan    │       │ GitOps  │              │
+│  └─────────┘      └─────────┘       └─────────┘       └─────────┘              │
+│       │                                                     │                   │
+│       │           5. OPERATE         6. MONITOR             │                   │
+│       │          ┌─────────┐        ┌─────────┐             │                   │
+│       └────────  │ Manage  │ ────── │ Prom +  │ ────────────┘                   │
+│        Feedback  │ K8s     │        │ Grafana │                                 │
+│                  └─────────┘        └─────────┘                                 │
+│                                                                                 │
+└────────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## Infrastructure
+## Step-by-Step Setup Guide
 
-### Kubernetes Resources
+### Phase 1: Local Development
 
-The application deploys the following Kubernetes resources:
+Local development allows you to test all services on your machine before deploying to Kubernetes.
 
-| Resource | Purpose |
-|----------|---------|
-| Namespace | Logical isolation (tms-app) |
-| Deployments | Application workloads |
-| Services | Internal networking |
-| Ingress | External traffic routing |
-| ConfigMaps | Non-sensitive configuration |
-| Secrets | Sensitive credentials |
-| HorizontalPodAutoscaler | Automatic scaling |
-| PodDisruptionBudget | High availability guarantees |
-| NetworkPolicy | Pod-to-pod traffic control |
-| ServiceAccount/RBAC | Security context and permissions |
-| ServiceMonitor | Prometheus metrics collection |
+#### Step 1.1: Clone the Repository
 
-### Horizontal Pod Autoscaling
+```bash
+git clone https://github.com/khaledhawil/End-to-End-DevOps-AWS-Nodejs-Python-MySQL.git
+cd End-to-End-DevOps-AWS-Nodejs-Python-MySQL
+```
 
-The HPA configuration maintains application performance under varying load:
+This downloads the complete project source code to your local machine.
 
-| Service | Min Replicas | Max Replicas | CPU Target | Memory Target |
-|---------|--------------|--------------|------------|---------------|
-| Frontend | 1 | 5 | 70% | 80% |
-| Auth Service | 1 | 10 | 70% | 80% |
-| Task Service | 1 | 10 | 70% | 80% |
+#### Step 1.2: Start Services with Docker Compose
 
-### Resource Allocation
+```bash
+cd services
+docker-compose up -d
+```
 
-| Service | CPU Request | CPU Limit | Memory Request | Memory Limit |
-|---------|-------------|-----------|----------------|--------------|
-| Auth Service | 100m | 500m | 128Mi | 512Mi |
-| Task Service | 100m | 500m | 128Mi | 512Mi |
-| Frontend | 50m | 200m | 64Mi | 256Mi |
+This command starts all services in containers:
+- MySQL database on port 3306
+- Auth service on port 8001
+- Task service on port 8002
+- Frontend on port 80 (via Nginx)
+
+#### Step 1.3: Verify Services are Running
+
+```bash
+docker-compose ps
+```
+
+Expected output shows all services in "running" state.
+
+#### Step 1.4: Access the Application
+
+Open your browser and navigate to:
+- Frontend: http://localhost
+- Auth API: http://localhost:8001/health
+- Task API: http://localhost:8002/health
+
+**Application Screenshot:**
+
+![Task Management Application](Screenshots/task-app.png)
+
+#### Step 1.5: Stop Local Development
+
+```bash
+docker-compose down -v
+```
+
+This stops all containers and removes volumes.
 
 ---
 
-## CI/CD Pipeline
+### Phase 2: Kubernetes Cluster Setup
 
-The GitHub Actions pipeline implements a comprehensive build, test, and deploy workflow.
+This phase covers setting up a production-ready RKE2 Kubernetes cluster on 3 Ubuntu VMs.
 
-### Pipeline Stages
+#### Step 2.1: Prepare VMs
 
-**Stage 1: Version Generation**
-- Generates semantic version based on run number (MAJOR.MINOR.PATCH)
-- Outputs version tag for Docker image tagging
+Prepare 3 Ubuntu VMs with the following requirements:
+- 1 Master Node: 2 CPU, 4GB RAM, 50GB storage
+- 2 Worker Nodes: 2 CPU, 4GB RAM, 50GB storage each
 
-**Stage 2: Change Detection**
-- Analyzes which services have changed
-- Triggers selective builds only for modified services
-- Reduces build time and resource consumption
+Run on all nodes:
 
-**Stage 3: Security Scanning**
-- Trivy filesystem scan for dependency vulnerabilities
-- SARIF report generation for GitHub Security tab integration
-- Configurable severity thresholds
+```bash
+# Update system
+sudo apt update && sudo apt upgrade -y
 
-**Stage 4: Docker Build and Push**
-- Multi-stage Docker builds for optimized image size
-- Alpine-based images for minimal attack surface
-- Parallel builds for independent services
-- Automatic push to Docker Hub registry
+# Disable swap (required for Kubernetes)
+sudo swapoff -a
+sudo sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+```
 
-**Stage 5: Manifest Update**
-- Updates Kubernetes manifests with new image tags
-- Commits changes back to repository
-- Triggers Flux reconciliation for deployment
+Swap must be disabled because Kubernetes manages memory allocation directly and swap can interfere with container memory limits.
 
-**Stage 6: Notifications**
-- Slack integration for pipeline status updates
-- Success/failure notifications with build details
+#### Step 2.2: Set Hostnames
 
-### Pipeline Triggers
+On Master Node:
+```bash
+sudo hostnamectl set-hostname rke2-master
+```
+
+On Worker 1:
+```bash
+sudo hostnamectl set-hostname rke2-worker1
+```
+
+On Worker 2:
+```bash
+sudo hostnamectl set-hostname rke2-worker2
+```
+
+#### Step 2.3: Configure /etc/hosts
+
+Add to all nodes (replace with your IPs):
+
+```bash
+sudo nano /etc/hosts
+```
+
+```
+192.168.1.10  rke2-master
+192.168.1.11  rke2-worker1
+192.168.1.12  rke2-worker2
+```
+
+This enables hostname-based communication between nodes.
+
+#### Step 2.4: Install RKE2 Server (Master Node)
+
+```bash
+# Download and install RKE2
+curl -sfL https://get.rke2.io | sudo sh -
+
+# Enable and start RKE2 server
+sudo systemctl enable rke2-server.service
+sudo systemctl start rke2-server.service
+```
+
+Wait 2-3 minutes for the server to initialize. RKE2 automatically installs containerd, etcd, and all control plane components.
+
+#### Step 2.5: Get Node Token
+
+On Master Node:
+
+```bash
+sudo cat /var/lib/rancher/rke2/server/node-token
+```
+
+Save this token - you need it to join worker nodes to the cluster.
+
+#### Step 2.6: Install RKE2 Agent (Worker Nodes)
+
+On each Worker Node:
+
+```bash
+# Download and install RKE2 agent
+curl -sfL https://get.rke2.io | INSTALL_RKE2_TYPE="agent" sudo sh -
+
+# Configure the agent
+sudo mkdir -p /etc/rancher/rke2/
+sudo nano /etc/rancher/rke2/config.yaml
+```
+
+Add this content (replace with your master IP and token):
 
 ```yaml
-on:
-  push:
-    branches: [master, develop]
-    paths:
-      - 'services/auth-service/**'
-      - 'services/task-service/**'
-      - 'services/frontend/**'
-      - 'services/nginx/**'
+server: https://192.168.1.10:9345
+token: <your-node-token-from-step-2.5>
+```
+
+Start the agent:
+
+```bash
+sudo systemctl enable rke2-agent.service
+sudo systemctl start rke2-agent.service
+```
+
+#### Step 2.7: Configure kubectl
+
+On Master Node:
+
+```bash
+# Add kubectl to PATH
+echo 'export PATH=$PATH:/var/lib/rancher/rke2/bin' >> ~/.bashrc
+echo 'export KUBECONFIG=/etc/rancher/rke2/rke2.yaml' >> ~/.bashrc
+source ~/.bashrc
+
+# Copy kubeconfig for regular user access
+mkdir -p ~/.kube
+sudo cp /etc/rancher/rke2/rke2.yaml ~/.kube/config
+sudo chown $(id -u):$(id -g) ~/.kube/config
+```
+
+#### Step 2.8: Verify Cluster
+
+```bash
+kubectl get nodes
+```
+
+Expected output shows 3 nodes in "Ready" state.
+
+**Kubernetes Cluster Screenshot:**
+
+![Kubernetes Cluster](Screenshots/k8s-cluster.png)
+
+---
+
+### Phase 3: GitOps with Flux CD
+
+Flux CD automatically syncs your Kubernetes cluster with the Git repository.
+
+#### Step 3.1: Install Flux CLI
+
+```bash
+curl -s https://fluxcd.io/install.sh | sudo bash
+```
+
+This installs the Flux command-line tool for managing GitOps workflows.
+
+#### Step 3.2: Export GitHub Token
+
+```bash
+export GITHUB_TOKEN=<your-github-personal-access-token>
+export GITHUB_USER=<your-github-username>
+```
+
+Create a Personal Access Token in GitHub with `repo` permissions.
+
+#### Step 3.3: Bootstrap Flux
+
+```bash
+flux bootstrap github \
+  --owner=$GITHUB_USER \
+  --repository=End-to-End-DevOps-AWS-Nodejs-Python-MySQL \
+  --branch=master \
+  --path=./flux/clusters/local \
+  --personal
+```
+
+This command:
+1. Installs Flux controllers in your cluster
+2. Creates a GitRepository resource pointing to your repo
+3. Sets up Kustomization resources to deploy your manifests
+
+#### Step 3.4: Verify Flux Installation
+
+```bash
+flux check
+```
+
+All components should show as "ready".
+
+#### Step 3.5: Monitor Reconciliation
+
+```bash
+flux get kustomizations --watch
+```
+
+Watch Flux deploy your application automatically.
+
+**Flux/Weave GitOps Dashboard Screenshot:**
+
+![Weave GitOps Dashboard](Screenshots/weavy-gui.png)
+
+**Application Deployed via GitOps Screenshot:**
+
+![Application on Weave](Screenshots/app-on-weavy.png)
+
+#### Step 3.6: Access Weave GitOps Dashboard (Optional)
+
+```bash
+kubectl port-forward svc/weave-gitops -n flux-system 9001:9001
+```
+
+Open http://localhost:9001 in your browser.
+
+---
+
+### Phase 4: CI/CD Pipeline
+
+The GitHub Actions pipeline automates building, testing, and deploying your application.
+
+#### Step 4.1: Configure GitHub Secrets
+
+Navigate to your repository Settings > Secrets and variables > Actions.
+
+Add these secrets:
+
+| Secret Name | Description |
+|-------------|-------------|
+| DOCKER_USERNAME | Your Docker Hub username |
+| DOCKER_PASSWORD | Your Docker Hub password or access token |
+| SLACK_WEBHOOK_URL | (Optional) Slack webhook for notifications |
+
+#### Step 4.2: Pipeline Trigger
+
+The pipeline triggers automatically when you push changes to:
+- `services/auth-service/**`
+- `services/task-service/**`
+- `services/frontend/**`
+- `services/nginx/**`
+
+#### Step 4.3: Pipeline Stages Explanation
+
+**Stage 1: Generate Version**
+```yaml
+version: ${{ env.VERSION_MAJOR }}.${{ env.VERSION_MINOR }}.${{ github.run_number }}
+```
+Creates semantic version like `1.0.25` based on run number.
+
+**Stage 2: Detect Changes**
+Uses `dorny/paths-filter` to determine which services changed. Only changed services are rebuilt, saving time and resources.
+
+**Stage 3: Security Scan**
+```yaml
+- name: Run Trivy vulnerability scanner
+  uses: aquasecurity/trivy-action@master
+  with:
+    scan-type: 'fs'
+    severity: 'CRITICAL,HIGH'
+```
+Scans code for vulnerabilities before building.
+
+**Stage 4: Build and Push**
+```yaml
+- name: Build and push Docker image
+  uses: docker/build-push-action@v5
+  with:
+    push: true
+    tags: ${{ env.DOCKER_USERNAME }}/task-manager-auth:${{ needs.generate-version.outputs.version }}
+```
+Builds Docker images and pushes to Docker Hub.
+
+**Stage 5: Update Manifests**
+Automatically updates Kubernetes deployment files with new image tags and commits back to the repository.
+
+**Stage 6: Slack Notification**
+Sends pipeline status to Slack channel.
+
+**Pipeline Summary Screenshot:**
+
+![Pipeline Summary](Screenshots/pipline-summary.png)
+
+**CD Pipeline Screenshot:**
+
+![CD Pipeline](Screenshots/cd-pipline.png)
+
+**Slack Notification Screenshot:**
+
+![Slack Notification](Screenshots/slack-.png)
+
+#### Step 4.4: Manual Pipeline Trigger
+
+You can also trigger the pipeline manually:
+
+1. Go to Actions tab in GitHub
+2. Select "CI/CD Pipeline - Service Change Detection"
+3. Click "Run workflow"
+
+---
+
+### Phase 5: Monitoring Stack
+
+Prometheus and Grafana provide observability for your cluster and applications.
+
+#### Step 5.1: Monitoring Components
+
+The monitoring stack is deployed automatically via Flux:
+
+- **Prometheus**: Collects and stores metrics
+- **Grafana**: Visualizes metrics in dashboards
+- **AlertManager**: Routes alerts to Slack, email, etc.
+
+#### Step 5.2: Access Grafana
+
+```bash
+kubectl port-forward svc/kube-prometheus-stack-grafana -n monitoring 3000:80
+```
+
+Open http://localhost:3000
+
+Default credentials:
+- Username: `admin`
+- Password: `admin123`
+
+#### Step 5.3: Pre-configured Dashboards
+
+Grafana includes dashboards for:
+- Kubernetes cluster overview
+- Node metrics (CPU, memory, disk)
+- Pod metrics
+- Application metrics via ServiceMonitors
+
+**Grafana Dashboard Screenshot:**
+
+![Grafana Dashboard](Screenshots/Grafana.png)
+
+#### Step 5.4: Configure ServiceMonitors
+
+ServiceMonitors tell Prometheus which endpoints to scrape:
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: auth-service-monitor
+  namespace: tms-app
+spec:
+  selector:
+    matchLabels:
+      app: auth-service
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+```
+
+#### Step 5.5: Create Custom Alerts
+
+Add alerting rules in Prometheus:
+
+```yaml
+groups:
+  - name: application
+    rules:
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status="500"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: High error rate detected
 ```
 
 ---
 
 ## Security Implementation
 
-### Authentication and Authorization
-
-**JWT Token Flow:**
-1. User authenticates via /login endpoint
-2. Server validates credentials against hashed password
-3. JWT token generated with user ID and expiration
-4. Token returned to client for subsequent requests
-5. Protected endpoints validate token on each request
-
-**Password Requirements:**
-- Minimum 12 characters
-- At least one uppercase letter
-- At least one lowercase letter
-- At least one numeric digit
-- At least one special character
-
-### Rate Limiting Configuration
-
-| Endpoint Category | Window | Max Requests |
-|-------------------|--------|--------------|
-| Login | 15 minutes | 5 |
-| Registration | 1 hour | 3 |
-| General API | 15 minutes | 100 |
-| Task Creation | 1 minute | 20 |
-
-### Security Headers
-
-The following HTTP security headers are applied via Helmet:
-
-| Header | Value |
-|--------|-------|
-| Content-Security-Policy | Restrictive CSP directives |
-| Strict-Transport-Security | max-age=31536000; includeSubDomains; preload |
-| X-Content-Type-Options | nosniff |
-| X-Frame-Options | DENY |
-| X-XSS-Protection | 1; mode=block |
-
-### Kubernetes Security Context
-
-All pods run with the following security constraints:
-
-```yaml
-securityContext:
-  runAsNonRoot: true
-  runAsUser: 1000
-  fsGroup: 1000
-  allowPrivilegeEscalation: false
-  capabilities:
-    drop:
-      - ALL
-  seccompProfile:
-    type: RuntimeDefault
-```
-
-### Network Policies
-
-Zero-trust network model with explicit allow rules:
-
-| Policy | Source | Destination | Ports |
-|--------|--------|-------------|-------|
-| default-deny-all | * | * | None (deny all) |
-| frontend-network-policy | Ingress Controller | Frontend | 80 |
-| auth-service-network-policy | Frontend, Ingress | Auth Service | 8001 |
-| task-service-network-policy | Frontend, Ingress | Task Service | 8002 |
-| mysql-network-policy | Auth, Task Services | MySQL | 3306 |
-
-### Pod Disruption Budgets
-
-High availability guarantees during voluntary disruptions:
-
-| Service | Min Available | Purpose |
-|---------|---------------|----------|
-| Frontend | 1 | Ensures at least one pod during node drain |
-| Auth Service | 1 | Maintains authentication availability |
-| Task Service | 1 | Maintains task operations availability |
-
-### RBAC Configuration
-
-Least-privilege access model:
-
-| ServiceAccount | Role | Permissions |
-|----------------|------|-------------|
-| frontend-sa | - | No cluster access |
-| auth-service-sa | secret-reader | Get/List specific secrets |
-| task-service-sa | secret-reader | Get/List specific secrets |
-| mysql-sa | - | No cluster access |
-
-### Secret Management
-
-Sensitive values are managed via Kubernetes Secrets:
-
-| Secret Name | Contains |
-|-------------|----------|
-| jwt-secret | JWT signing key |
-| db-password | MySQL root password |
-| db-username | MySQL username |
-| sql-endpoint | MySQL service endpoint |
-
----
-
-## Database Schema
-
-### Users Table
-
-```sql
-CREATE TABLE users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_username (username)
-);
-```
-
-### Tasks Table
-
-```sql
-CREATE TABLE tasks (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    title VARCHAR(200) NOT NULL,
-    description TEXT,
-    priority ENUM('low', 'medium', 'high') DEFAULT 'medium',
-    status ENUM('pending', 'in_progress', 'completed') DEFAULT 'pending',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_user_id (user_id),
-    INDEX idx_status (status)
-);
-```
-
----
-
-## Monitoring and Observability
-
-### Prometheus Stack
-
-The monitoring infrastructure includes:
-
-- **Prometheus**: Metrics collection and storage
-- **Grafana**: Visualization dashboards
-- **AlertManager**: Alert routing and notifications
-
-### Service Monitors
-
-Custom ServiceMonitor resources collect metrics from:
-
-- Auth Service (/metrics endpoint)
-- Task Service (/metrics endpoint)
-- Frontend (nginx metrics)
-
-### Health Checks
-
-All services implement health endpoints:
-
-| Service | Endpoint | Interval |
-|---------|----------|----------|
-| Auth Service | GET /health | 10s |
-| Task Service | GET /health | 10s |
-| Frontend | GET /health | 10s |
-
-### Kubernetes Probes
-
-| Probe Type | Initial Delay | Period | Timeout | Failure Threshold |
-|------------|---------------|--------|---------|-------------------|
-| Liveness | 30s | 10s | 5s | 3 |
-| Readiness | 10s | 5s | 3s | 3 |
-
----
-
-## Local Development
-
-### Prerequisites
-
-- Docker and Docker Compose
-- Node.js 22.x (for local development)
-- Python 3.12 (for local development)
-
-### Quick Start
-
-```bash
-# Clone the repository
-git clone https://github.com/khaledhawil/End-to-End-DevOps-AWS-Nodejs-Python-MySQL.git
-cd End-to-End-DevOps-AWS-Nodejs-Python-MySQL
-
-# Start all services
-cd services
-docker-compose up -d
-
-# Access the application
-# Frontend: http://localhost
-# Auth Service: http://localhost:8001
-# Task Service: http://localhost:8002
-```
-
-### Development Workflow
-
-```bash
-# Rebuild specific service after changes
-docker-compose up -d --build auth-service
-
-# View logs
-docker-compose logs -f auth-service
-
-# Stop all services
-docker-compose down
-
-# Stop and remove volumes
-docker-compose down -v
-```
-
----
-
-## Kubernetes Deployment
-
-### Prerequisites
-
-- Kubernetes cluster (RKE2, EKS, GKE, or similar)
-- kubectl configured with cluster access
-- Flux CD installed
-- Docker Hub account for image registry
-
-### Flux GitOps Setup
-
-```bash
-# Bootstrap Flux with your repository
-flux bootstrap github \
-  --owner=<your-github-username> \
-  --repository=End-to-End-DevOps-AWS-Nodejs-Python-MySQL \
-  --branch=master \
-  --path=./flux/clusters/local \
-  --personal
-
-# Verify Flux installation
-flux check
-
-# Monitor reconciliation
-flux get kustomizations --watch
-```
-
-### Manual Deployment
-
-```bash
-# Apply base resources
-kubectl apply -k k8s/base
-
-# Apply environment-specific overlay
-kubectl apply -k k8s/overlays/local
-
-# Verify deployment
-kubectl get pods -n tms-app
-kubectl get svc -n tms-app
-kubectl get ingress -n tms-app
-```
-
-### Environment-Specific Configuration
-
-| Environment | Overlay Path | Database | Secrets |
-|-------------|--------------|----------|---------|
-| Local | k8s/overlays/local | Local MySQL pod | Local secrets.yaml |
-| Staging | k8s/overlays/staging | Local MySQL pod | Staging secrets.yaml |
-| Production | k8s/overlays/production | AWS RDS | Sealed Secrets |
-
----
-
-## Environment Configuration
-
-### Required Environment Variables
-
-**Auth Service:**
-| Variable | Description | Default |
-|----------|-------------|---------|
-| PORT | Service port | 8001 |
-| DB_HOST | MySQL hostname | - |
-| DB_USER | MySQL username | - |
-| DB_PASSWORD | MySQL password | - |
-| DB_NAME | Database name | task_management |
-| JWT_SECRET | Token signing key | - |
-
-**Task Service:**
-| Variable | Description | Default |
-|----------|-------------|---------|
-| PORT | Service port | 8002 |
-| DB_HOST | MySQL hostname | - |
-| DB_USER | MySQL username | - |
-| DB_PASSWORD | MySQL password | - |
-| DB_NAME | Database name | task_management |
-| JWT_SECRET | Token signing key | - |
-| ALLOWED_ORIGINS | CORS allowed origins | localhost |
-
-### GitHub Actions Secrets
-
-| Secret | Purpose |
-|--------|---------|
-| DOCKER_USERNAME | Docker Hub username |
-| DOCKER_TOKEN | Docker Hub access token |
-| SLACK_WEBHOOK_URL | Slack notifications (optional) |
-
----
-
-## API Reference
-
-### Authentication Endpoints
-
-**Register User**
-```
-POST /register
-Content-Type: application/json
-
-{
-  "username": "string (3-50 chars, alphanumeric)",
-  "password": "string (12+ chars, complexity requirements)"
-}
-
-Response: 201 Created
-{
-  "message": "User registered successfully"
-}
-```
-
-**Login**
-```
-POST /login
-Content-Type: application/json
-
-{
-  "username": "string",
-  "password": "string"
-}
-
-Response: 200 OK
-{
-  "token": "jwt-token-string"
-}
-```
-
-### Task Endpoints
-
-**List Tasks**
-```
-GET /tasks
-Authorization: Bearer <token>
-
-Response: 200 OK
-[
-  {
-    "id": 1,
-    "title": "string",
-    "description": "string",
-    "priority": "low|medium|high",
-    "status": "pending|in_progress|completed",
-    "created_at": "timestamp"
-  }
-]
-```
-
-**Create Task**
-```
-POST /tasks
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "title": "string (1-200 chars)",
-  "description": "string (1-2000 chars)",
-  "priority": "low|medium|high"
-}
-
-Response: 201 Created
-{
-  "message": "Task created successfully",
-  "id": 1
-}
-```
+### Application Security
+
+| Feature | Implementation |
+|---------|----------------|
+| Password Hashing | bcrypt with salt rounds |
+| Authentication | JWT tokens with expiration |
+| Rate Limiting | 5 login attempts per 15 minutes |
+| Input Validation | express-validator and Pydantic |
+| Security Headers | Helmet middleware (CSP, HSTS, XSS) |
+| CORS | Configurable allowed origins |
+
+### Kubernetes Security
+
+| Feature | Implementation |
+|---------|----------------|
+| Network Policies | Zero-trust model with explicit allow rules |
+| RBAC | Least-privilege ServiceAccounts |
+| Security Context | Non-root containers, dropped capabilities |
+| Pod Disruption Budgets | Ensures availability during updates |
+| Secrets Management | Kubernetes Secrets for sensitive data |
+
+### Container Security
+
+| Feature | Implementation |
+|---------|----------------|
+| Base Images | Alpine-based minimal images |
+| Non-root User | All containers run as UID 1000 |
+| Read-only Filesystem | Where applicable |
+| Image Scanning | Trivy in CI/CD pipeline |
+| No Privileged Containers | allowPrivilegeEscalation: false |
 
 ---
 
@@ -643,116 +763,119 @@ Response: 201 Created
 
 ### Common Issues
 
-**Pods in CrashLoopBackOff**
+**1. Pods not starting**
+
 ```bash
-# Check pod logs
-kubectl logs -n tms-app <pod-name>
-
-# Check pod events
-kubectl describe pod -n tms-app <pod-name>
-
-# Common causes:
-# - Missing secrets
-# - Database connection failure
-# - Invalid JWT_SECRET configuration
+kubectl describe pod <pod-name> -n tms-app
+kubectl logs <pod-name> -n tms-app
 ```
 
-**Database Connection Errors**
+Check events and logs for error messages.
+
+**2. Database connection failures**
+
 ```bash
-# Verify MySQL pod is running
 kubectl get pods -n tms-app -l app=mysql
-
-# Check MySQL logs
-kubectl logs -n tms-app -l app=mysql
-
-# Test connectivity from service pod
-kubectl exec -it -n tms-app <auth-pod> -- nc -zv mysql-service 3306
+kubectl logs -l app=mysql -n tms-app
 ```
 
-**HPA Thrashing (Constant Scaling)**
+Ensure MySQL pod is running and secrets are correctly configured.
+
+**3. Flux not syncing**
+
 ```bash
-# Check HPA status
-kubectl get hpa -n tms-app
-
-# Review scaling events
-kubectl describe hpa -n tms-app auth-service-hpa
-
-# Solution: Adjust stabilization windows in k8s/base/hpa.yaml
-```
-
-**Flux Reconciliation Failures**
-```bash
-# Check Flux logs
+flux get sources git
+flux get kustomizations
 flux logs --level=error
-
-# Force reconciliation
-flux reconcile kustomization task-management-system-local
-
-# Suspend and resume
-flux suspend kustomization task-management-system-local
-flux resume kustomization task-management-system-local
 ```
+
+Check Git repository connectivity and Kustomization errors.
+
+**4. Pipeline failures**
+
+Check GitHub Actions logs for specific error messages. Common issues:
+- Missing secrets (DOCKER_USERNAME, DOCKER_PASSWORD)
+- Dockerfile syntax errors
+- Trivy security scan blocking critical vulnerabilities
 
 ### Health Check Commands
 
 ```bash
-# Full cluster health
+# Cluster health
+kubectl get nodes
+kubectl get pods -A
+
+# Application health
 kubectl get pods -n tms-app
 kubectl get svc -n tms-app
 kubectl get ingress -n tms-app
-kubectl top pods -n tms-app
 
-# Service-specific health
-curl -s http://<ingress-ip>/api/auth/health
-curl -s http://<ingress-ip>/api/tasks/health
+# Flux health
+flux check
+flux get all
+
+# Monitoring health
+kubectl get pods -n monitoring
 ```
 
 ---
 
-## Deployment Diagram
+## API Reference
 
-```
-+-----------------------------------------------------------------------------------+
-|                                 Kubernetes Cluster                                |
-+-----------------------------------------------------------------------------------+
-|                                                                                   |
-|  +-------------+     +------------------+     +------------------+                |
-|  | Flux CD     |---->| GitRepository    |---->| Kustomization    |                |
-|  | Controller  |     | (GitHub)         |     | (Reconciler)     |                |
-|  +-------------+     +------------------+     +------------------+                |
-|                                                       |                          |
-|                                                       v                          |
-|  +------------------------------- tms-app namespace --------------+              |
-|  |                                                                |              |
-|  |  +-----------+    +--------------+    +---------------+        |              |
-|  |  | Ingress   |--->| Frontend     |--->| Auth Service  |        |              |
-|  |  | Controller|    | (React/Nginx)|    | (Node.js)     |        |              |
-|  |  +-----------+    +--------------+    +---------------+        |              |
-|  |        |                 |                   |                 |              |
-|  |        |                 |                   v                 |              |
-|  |        |                 |            +---------------+        |              |
-|  |        +-----------------|----------->| Task Service  |        |              |
-|  |                          |            | (Python/Flask)|        |              |
-|  |                          |            +---------------+        |              |
-|  |                          |                   |                 |              |
-|  |                          v                   v                 |              |
-|  |                    +---------------------------+               |              |
-|  |                    |        MySQL              |               |              |
-|  |                    |    (Persistent Storage)  |               |              |
-|  |                    +---------------------------+               |              |
-|  |                                                                |              |
-|  +----------------------------------------------------------------+              |
-|                                                                                   |
-|  +----------------------- monitoring namespace -------------------+              |
-|  |                                                                |              |
-|  |  +------------+    +------------+    +--------------+          |              |
-|  |  | Prometheus |--->| Grafana    |    | AlertManager |          |              |
-|  |  +------------+    +------------+    +--------------+          |              |
-|  |                                                                |              |
-|  +----------------------------------------------------------------+              |
-|                                                                                   |
-+-----------------------------------------------------------------------------------+
-```
+### Auth Service Endpoints
+
+| Method | Endpoint | Description | Rate Limit |
+|--------|----------|-------------|------------|
+| POST | /register | Register new user | 3/hour |
+| POST | /login | Authenticate user | 5/15min |
+| POST | /verify | Verify JWT token | 100/15min |
+| GET | /health | Health check | Unlimited |
+
+### Task Service Endpoints
+
+| Method | Endpoint | Description | Rate Limit |
+|--------|----------|-------------|------------|
+| GET | /tasks | List user tasks | 100/15min |
+| POST | /tasks | Create task | 20/min |
+| PUT | /tasks/:id | Update task | 100/15min |
+| DELETE | /tasks/:id | Delete task | 100/15min |
+| GET | /health | Health check | Unlimited |
+
+---
+
+## Environment Variables
+
+### Auth Service
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| PORT | Service port | 8001 |
+| DB_HOST | MySQL hostname | mysql |
+| DB_USER | MySQL username | root |
+| DB_PASS | MySQL password | - |
+| DB_NAME | Database name | task_manager |
+| JWT_SECRET | Token signing key | - |
+
+### Task Service
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| PORT | Service port | 8002 |
+| DB_HOST | MySQL hostname | mysql |
+| DB_USER | MySQL username | root |
+| DB_PASS | MySQL password | - |
+| DB_NAME | Database name | task_manager |
+| JWT_SECRET | Token signing key | - |
+
+---
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/new-feature`)
+3. Commit changes (`git commit -m 'Add new feature'`)
+4. Push to branch (`git push origin feature/new-feature`)
+5. Open a Pull Request
 
 ---
 
@@ -762,35 +885,15 @@ This project is licensed under the MIT License.
 
 ---
 
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit changes with descriptive messages
-4. Push to your fork
-5. Open a Pull Request
-
----
-
 ## Author
 
-Khaled Hawil
-
----
-
-## Version History
-
-| Version | Date | Changes |
-|---------|------|----------|
-| 1.0.0 | January 2026 | Initial release with full CI/CD pipeline |
-| 1.0.x | January 2026 | Security hardening and rate limiting |
+**Khaled Hawil**
 
 ---
 
 ## Acknowledgments
 
-- Kubernetes documentation and community
+- Kubernetes and RKE2 documentation
 - Flux CD project maintainers
 - GitHub Actions team
-- Open source security tools contributors
-- RKE2 and Rancher teams
+- Prometheus and Grafana communities
