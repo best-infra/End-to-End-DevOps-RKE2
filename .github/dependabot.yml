@@ -1,0 +1,90 @@
+# Dependabot Configuration
+# Automatically creates PRs for dependency updates
+
+version: 2
+updates:
+  # Auth Service (Node.js)
+  - package-ecosystem: "npm"
+    directory: "/services/auth-service"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "02:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "khaledhawil"
+    labels:
+      - "dependencies"
+      - "auth-service"
+      - "security"
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+      include: "scope"
+    ignore:
+      # Ignore major version updates (breaking changes)
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    
+  # Task Service (Python)
+  - package-ecosystem: "pip"
+    directory: "/services/task-service"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "02:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "khaledhawil"
+    labels:
+      - "dependencies"
+      - "task-service"
+      - "security"
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+      include: "scope"
+    ignore:
+      # Ignore major version updates (breaking changes)
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    
+  # Frontend (Node.js)
+  - package-ecosystem: "npm"
+    directory: "/services/frontend"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "02:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "khaledhawil"
+    labels:
+      - "dependencies"
+      - "frontend"
+      - "security"
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+      include: "scope"
+    ignore:
+      # Ignore major version updates (breaking changes)
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "02:00"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "khaledhawil"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
