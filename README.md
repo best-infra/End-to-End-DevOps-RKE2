@@ -1,1105 +1,671 @@
-# Task Management System - Complete DevOps Pipeline
+# Task Management System
 
-A production-ready microservices application demonstrating end-to-end DevOps practices including GitOps, CI/CD automation, container orchestration, monitoring, and security scanning.
+A production-grade, cloud-native task management application demonstrating modern DevOps practices. This project implements a complete end-to-end pipeline from development to production deployment using containerization, Kubernetes orchestration, GitOps workflows, and comprehensive security hardening.
 
 ---
 
 ## Table of Contents
 
-1. [Project Overview](#project-overview)
-2. [System Architecture](#system-architecture)
-3. [Technology Stack](#technology-stack)
-4. [Tools Deep Dive](#tools-deep-dive)
-   - [RKE2 Kubernetes](#1-rke2-kubernetes)
-   - [Flux CD GitOps](#2-flux-cd-gitops)
-   - [Weave GitOps Dashboard](#3-weave-gitops-dashboard)
-   - [GitHub Actions CI/CD](#4-github-actions-cicd)
-   - [Prometheus Monitoring](#5-prometheus-monitoring)
-   - [Grafana Visualization](#6-grafana-visualization)
-   - [Horizontal Pod Autoscaler](#7-horizontal-pod-autoscaler-hpa)
-   - [Trivy Security Scanner](#8-trivy-security-scanner)
-   - [Kustomize Configuration](#9-kustomize-configuration)
-5. [Prerequisites](#prerequisites)
-6. [Complete Deployment Guide](#complete-deployment-guide)
-7. [Accessing the Applications](#accessing-the-applications)
+1. [Architecture Overview](#architecture-overview)
+2. [Technology Stack](#technology-stack)
+3. [Project Structure](#project-structure)
+4. [Services](#services)
+5. [Infrastructure](#infrastructure)
+6. [CI/CD Pipeline](#cicd-pipeline)
+7. [Security Implementation](#security-implementation)
 8. [Monitoring and Observability](#monitoring-and-observability)
-9. [Repository Structure](#repository-structure)
-10. [Screenshots](#screenshots)
-11. [Troubleshooting Guide](#troubleshooting-guide)
+9. [Local Development](#local-development)
+10. [Kubernetes Deployment](#kubernetes-deployment)
+11. [Environment Configuration](#environment-configuration)
+12. [API Reference](#api-reference)
+13. [Troubleshooting](#troubleshooting)
 
 ---
 
-## Project Overview
+## Architecture Overview
 
-This project implements a complete cloud-native task management application with a full DevOps pipeline. The system consists of:
-
-**Application Services:**
-- **Frontend**: React 18 single-page application with Vite build tool
-- **Auth Service**: Node.js/Express REST API for user authentication (JWT-based)
-- **Task Service**: Python/Flask REST API for task CRUD operations
-- **Database**: MySQL 8.0 for persistent storage
-
-**DevOps Components:**
-- **GitOps**: Flux CD for continuous delivery from Git
-- **CI/CD**: GitHub Actions for automated builds and security scanning
-- **Monitoring**: Prometheus + Grafana stack for observability
-- **Autoscaling**: HPA for dynamic pod scaling
-- **Security**: Trivy vulnerability scanning, Network Policies, RBAC
-
----
-
-## System Architecture
+The system follows a microservices architecture pattern with the following components:
 
 ```
-                                 +------------------+
-                                 |    Developer     |
-                                 +--------+---------+
-                                          |
-                                    git push
-                                          |
-                                          v
-                    +---------------------+----------------------+
-                    |                                            |
-                    v                                            v
-         +------------------+                         +-------------------+
-         |  GitHub Actions  |                         |    Flux CD        |
-         |  (CI Pipeline)   |                         |  (GitOps Engine)  |
-         +--------+---------+                         +---------+---------+
-                  |                                             |
-      +-----------+-----------+                                 |
-      |           |           |                                 |
-      v           v           v                                 |
-   Build      Trivy       Push to                               |
-   Images     Scan       Docker Hub                             |
-      |           |           |                                 |
-      +-----------+-----------+                                 |
-                  |                                             |
-                  v                                             v
-         +----------------+                          +-------------------+
-         |  Docker Hub    |                          | K8s Manifests     |
-         | (Registry)     |                          | (Git Repository)  |
-         +-------+--------+                          +---------+---------+
-                 |                                             |
-                 |            +------------------------+       |
-                 +----------->|  RKE2 Kubernetes       |<------+
-                              |  Cluster               |
-                              +------------------------+
-                                         |
-            +----------------------------+----------------------------+
-            |                            |                            |
-            v                            v                            v
-   +----------------+          +------------------+          +----------------+
-   |  tms-app       |          |  monitoring      |          |  flux-system   |
-   |  namespace     |          |  namespace       |          |  namespace     |
-   +----------------+          +------------------+          +----------------+
-   | - Frontend     |          | - Prometheus     |          | - Source Ctrl  |
-   | - Auth Service |          | - Grafana        |          | - Kustomize    |
-   | - Task Service |          | - Alertmanager   |          | - Helm Ctrl    |
-   | - MySQL        |          | - Node Exporter  |          | - Weave GitOps |
-   | - Ingress      |          | - Kube State     |          +----------------+
-   +----------------+          +------------------+
-            |                            |
-            v                            v
-   +----------------+          +------------------+
-   |  HPA           |          |  ServiceMonitors |
-   |  (Autoscaling) |          |  (Metrics)       |
-   +----------------+          +------------------+
+                                    [Ingress Controller]
+                                           |
+                    +----------------------+----------------------+
+                    |                      |                      |
+              [Frontend]            [Auth Service]         [Task Service]
+                    |                      |                      |
+                    +----------------------+----------------------+
+                                           |
+                                       [MySQL]
 ```
 
-**Data Flow:**
-
-```
-User Request --> Nginx Ingress --> Frontend (React)
-                                       |
-                      +----------------+----------------+
-                      |                                 |
-                      v                                 v
-               Auth Service                      Task Service
-               (Node.js)                         (Python)
-                      |                                 |
-                      +----------------+----------------+
-                                       |
-                                       v
-                                    MySQL
-                                  (Database)
-```
+**Request Flow:**
+1. External traffic enters through the Ingress Controller
+2. Nginx routes requests to appropriate backend services based on path
+3. Authentication requests are handled by the Auth Service (Node.js)
+4. Task operations are processed by the Task Service (Python/Flask)
+5. Both services communicate with a shared MySQL database
+6. JWT tokens are used for stateless authentication between services
 
 ---
 
 ## Technology Stack
 
-| Category | Technology | Version | Purpose |
-|----------|------------|---------|---------|
-| **Orchestration** | RKE2 | v1.28+ | Production Kubernetes distribution |
-| **GitOps** | Flux CD | v2.0+ | Continuous delivery from Git |
-| **GitOps UI** | Weave GitOps | v0.38+ | Visual Flux management |
-| **CI/CD** | GitHub Actions | - | Build, test, deploy automation |
-| **Monitoring** | Prometheus | v2.48+ | Metrics collection and alerting |
-| **Visualization** | Grafana | v10.2+ | Dashboards and analytics |
-| **Security** | Trivy | v0.48+ | Container vulnerability scanning |
-| **Registry** | Docker Hub | - | Container image storage |
-| **Config** | Kustomize | v5.0+ | Kubernetes manifest management |
-| **Ingress** | Nginx | v1.9+ | HTTP routing and load balancing |
-| **Frontend** | React + Vite | v18 / v5 | User interface |
-| **Auth API** | Node.js + Express | v20 | Authentication service |
-| **Task API** | Python + Flask | v3.11 | Task management service |
-| **Database** | MySQL | v8.0 | Data persistence |
+### Application Layer
+| Component | Technology | Version |
+|-----------|------------|---------|
+| Frontend | React with Vite | 5.x |
+| Auth Service | Node.js with Express | 22.x |
+| Task Service | Python with Flask | 3.12 |
+| Database | MySQL | 8.0 |
+| Reverse Proxy | Nginx | 1.27 |
+
+### Infrastructure Layer
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| Container Runtime | Docker | Application containerization |
+| Orchestration | Kubernetes (RKE2) | Container orchestration |
+| GitOps | Flux CD | Continuous deployment |
+| CI/CD | GitHub Actions | Continuous integration |
+| Monitoring | Prometheus + Grafana | Metrics and visualization |
+| Security Scanning | Trivy | Vulnerability detection |
+
+### Security Components
+| Component | Purpose |
+|-----------|---------|
+| Helmet | HTTP security headers |
+| express-rate-limit | API rate limiting (Node.js) |
+| Flask-Limiter | API rate limiting (Python) |
+| express-validator | Input validation (Node.js) |
+| Pydantic | Input validation (Python) |
+| bcrypt | Password hashing |
+| JWT | Stateless authentication |
 
 ---
 
-## Tools Deep Dive
+## Project Structure
 
-### 1. RKE2 Kubernetes
-
-**What is RKE2?**
-RKE2 (Rancher Kubernetes Engine 2) is a fully conformant Kubernetes distribution focused on security and compliance. It's designed for production environments requiring high security standards.
-
-**Key Features:**
-- CIS Kubernetes Benchmark compliant out of the box
-- Uses containerd as the container runtime (not Docker)
-- Embedded etcd for cluster state storage
-- Automatic certificate rotation
-- Hardened security defaults
-
-**How to Use:**
-
-```bash
-# Install RKE2 on control plane node
-curl -sfL https://get.rke2.io | sh -
-systemctl enable rke2-server.service
-systemctl start rke2-server.service
-
-# Get node token for workers
-cat /var/lib/rancher/rke2/server/node-token
-
-# Configure kubectl
-export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
-kubectl get nodes
-
-# Check cluster health
-kubectl get componentstatuses
-kubectl cluster-info
 ```
-
-**Verify Installation:**
-```bash
-# All nodes should be Ready
-kubectl get nodes -o wide
-NAME          STATUS   ROLES                       AGE   VERSION
-master        Ready    control-plane,etcd,master   1d    v1.28.x+rke2r1
-worker-1      Ready    <none>                      1d    v1.28.x+rke2r1
-worker-2      Ready    <none>                      1d    v1.28.x+rke2r1
-```
-
----
-
-### 2. Flux CD GitOps
-
-**What is Flux CD?**
-Flux is a GitOps operator that continuously monitors your Git repository and automatically applies changes to your Kubernetes cluster. It ensures your cluster state always matches what's defined in Git.
-
-**Core Components:**
-- **Source Controller**: Watches Git repositories for changes
-- **Kustomize Controller**: Applies Kustomize configurations
-- **Helm Controller**: Manages Helm releases
-- **Notification Controller**: Sends alerts on events
-
-**How to Use:**
-
-```bash
-# Install Flux CLI
-curl -s https://fluxcd.io/install.sh | sudo bash
-
-# Verify CLI installation
-flux --version
-
-# Install Flux components in cluster
-flux install
-
-# Verify Flux is running
-flux check
-kubectl get pods -n flux-system
-
-# Create GitRepository source
-kubectl apply -f flux/clusters/local/git-repository.yaml
-
-# Create Kustomization to deploy app
-kubectl apply -f flux/clusters/local/kustomization-app.yaml
-
-# Check synchronization status
-flux get sources git
-flux get kustomizations
-
-# Force reconciliation
-flux reconcile source git task-management-system
-flux reconcile kustomization task-management-system-local
-
-# View Flux logs
-flux logs --follow
-```
-
-**GitRepository Configuration:**
-```yaml
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: GitRepository
-metadata:
-  name: task-management-system
-  namespace: flux-system
-spec:
-  interval: 30s              # Check for changes every 30 seconds
-  ref:
-    branch: master           # Monitor master branch
-  url: https://github.com/your-repo.git
-```
-
-**Kustomization Configuration:**
-```yaml
-apiVersion: kustomize.toolkit.fluxcd.io/v1
-kind: Kustomization
-metadata:
-  name: task-management-system-local
-  namespace: flux-system
-spec:
-  interval: 1m0s             # Reconcile every minute
-  path: ./k8s/overlays/local # Path to Kustomize overlay
-  prune: true                # Remove deleted resources
-  sourceRef:
-    kind: GitRepository
-    name: task-management-system
-  healthChecks:              # Wait for deployments to be healthy
-    - apiVersion: apps/v1
-      kind: Deployment
-      name: frontend
-      namespace: tms-app
+.
+├── .github/
+│   ├── workflows/
+│   │   ├── ci-cd-pipeline.yml      # Main CI/CD pipeline
+│   │   └── monthly-updates.yml      # Dependency update automation
+│   └── dependabot.yml               # Automated dependency updates
+├── flux/
+│   └── clusters/
+│       ├── local/                   # Local environment Flux config
+│       ├── staging/                 # Staging environment Flux config
+│       └── production/              # Production environment Flux config
+├── k8s/
+│   ├── base/                        # Base Kubernetes manifests
+│   ├── monitoring/                  # Prometheus/Grafana stack
+│   └── overlays/
+│       ├── local/                   # Local environment overrides
+│       ├── staging/                 # Staging environment overrides
+│       └── production/              # Production environment overrides
+├── services/
+│   ├── auth-service/                # Node.js authentication service
+│   ├── task-service/                # Python task management service
+│   ├── frontend/                    # React frontend application
+│   ├── nginx/                       # Nginx reverse proxy
+│   └── docker-compose.yml           # Local development composition
+└── scripts/
+    └── monthly-update.sh            # Manual dependency update script
 ```
 
 ---
 
-### 3. Weave GitOps Dashboard
+## Services
 
-**What is Weave GitOps?**
-Weave GitOps provides a graphical user interface for managing Flux CD. It allows you to visualize your GitOps pipelines, monitor synchronization status, and troubleshoot issues.
+### Auth Service (Node.js/Express)
 
-**How to Install:**
+Handles user authentication and authorization.
 
-```bash
-# Create HelmRepository for Weave GitOps
-kubectl apply -f - <<EOF
-apiVersion: source.toolkit.fluxcd.io/v1beta2
-kind: HelmRepository
-metadata:
-  name: ww-gitops
-  namespace: flux-system
-spec:
-  interval: 1h
-  url: https://helm.gitops.weave.works
-EOF
+**Endpoints:**
+| Method | Path | Description | Rate Limit |
+|--------|------|-------------|------------|
+| POST | /register | User registration | 3/hour |
+| POST | /login | User authentication | 5/15min |
+| GET | /health | Health check | Unlimited |
 
-# Create admin password secret
-PASSWORD="admin123"
-HASHED=$(htpasswd -nbB admin "$PASSWORD" | cut -d: -f2)
-kubectl create secret generic cluster-user-auth \
-  --namespace flux-system \
-  --from-literal=username=admin \
-  --from-literal=password="$HASHED"
+**Security Features:**
+- Password complexity requirements (12+ characters, mixed case, numbers, symbols)
+- Bcrypt password hashing with salt rounds
+- JWT token generation with configurable expiry
+- Rate limiting to prevent brute force attacks
+- Input validation on all endpoints
+- Security headers via Helmet middleware
 
-# Create HelmRelease for Weave GitOps
-kubectl apply -f - <<EOF
-apiVersion: helm.toolkit.fluxcd.io/v2
-kind: HelmRelease
-metadata:
-  name: ww-gitops
-  namespace: flux-system
-spec:
-  interval: 1h
-  chart:
-    spec:
-      chart: weave-gitops
-      sourceRef:
-        kind: HelmRepository
-        name: ww-gitops
-  values:
-    adminUser:
-      create: true
-      createClusterRole: true
-      createSecret: false
-      username: admin
-EOF
+### Task Service (Python/Flask)
 
-# Access the dashboard
-kubectl port-forward svc/ww-gitops-weave-gitops -n flux-system 9001:9001
-```
+Manages task CRUD operations.
 
-**Access URL:** http://localhost:9001
-**Credentials:** admin / admin123
+**Endpoints:**
+| Method | Path | Description | Rate Limit |
+|--------|------|-------------|------------|
+| GET | /tasks | List user tasks | 100/15min |
+| POST | /tasks | Create new task | 20/min |
+| PUT | /tasks/{id} | Update task | 100/15min |
+| DELETE | /tasks/{id} | Delete task | 100/15min |
+| GET | /health | Health check | Unlimited |
 
-**Dashboard Features:**
-- View all GitRepositories, Kustomizations, and HelmReleases
-- See real-time synchronization status
-- Inspect resource details and events
-- Navigate between related resources
-- View reconciliation history
+**Security Features:**
+- JWT token validation on protected routes
+- Pydantic models for request validation
+- Rate limiting via Flask-Limiter
+- SQL injection prevention via parameterized queries
+
+### Frontend (React/Vite)
+
+Single-page application for user interaction.
+
+**Features:**
+- Modern React with hooks
+- Real-time password strength indicator
+- JWT token management
+- Responsive design
+- Production build optimization via Vite
 
 ---
 
-### 4. GitHub Actions CI/CD
+## Infrastructure
 
-**What is GitHub Actions?**
-GitHub Actions is a CI/CD platform integrated directly into GitHub. It automates your build, test, and deployment workflows triggered by repository events.
+### Kubernetes Resources
 
-**Pipeline Stages:**
-1. **Change Detection**: Identify which services changed
-2. **Build**: Create Docker images for modified services
-3. **Security Scan**: Run Trivy vulnerability scanning
-4. **Push**: Upload images to Docker Hub
-5. **Update Manifests**: Update image tags in K8s manifests
-6. **Notify**: Send alerts for vulnerabilities
+The application deploys the following Kubernetes resources:
 
-**How to Configure:**
+| Resource | Purpose |
+|----------|---------|
+| Namespace | Logical isolation (tms-app) |
+| Deployments | Application workloads |
+| Services | Internal networking |
+| Ingress | External traffic routing |
+| ConfigMaps | Non-sensitive configuration |
+| Secrets | Sensitive credentials |
+| HorizontalPodAutoscaler | Automatic scaling |
+| PodDisruptionBudget | High availability guarantees |
+| NetworkPolicy | Pod-to-pod traffic control |
+| ServiceAccount/RBAC | Security context and permissions |
+| ServiceMonitor | Prometheus metrics collection |
 
-1. **Set up GitHub Secrets:**
-   - Go to Repository Settings > Secrets and variables > Actions
-   - Add required secrets:
+### Horizontal Pod Autoscaling
 
-| Secret | Description |
-|--------|-------------|
-| `DOCKER_USERNAME` | Docker Hub username |
-| `DOCKER_PASSWORD` | Docker Hub access token |
-| `SLACK_WEBHOOK_URL` | Slack webhook for notifications |
+The HPA configuration maintains application performance under varying load:
 
-2. **Trigger the Pipeline:**
-   - Push changes to `services/` directory
-   - Or manually trigger from Actions tab
-
-**Pipeline Configuration (`.github/workflows/ci-cd-pipeline.yml`):**
-```yaml
-name: CI/CD Pipeline
-
-on:
-  push:
-    branches: [master]
-    paths:
-      - 'services/**'
-  workflow_dispatch:
-
-jobs:
-  detect-changes:
-    runs-on: ubuntu-latest
-    outputs:
-      frontend: ${{ steps.changes.outputs.frontend }}
-      auth: ${{ steps.changes.outputs.auth }}
-      task: ${{ steps.changes.outputs.task }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v2
-        id: changes
-        with:
-          filters: |
-            frontend:
-              - 'services/frontend/**'
-            auth:
-              - 'services/auth-service/**'
-            task:
-              - 'services/task-service/**'
-
-  build-and-push:
-    needs: detect-changes
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Build Frontend
-        if: needs.detect-changes.outputs.frontend == 'true'
-        run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/task-manager-frontend:${{ github.sha }} ./services/frontend
-          
-      - name: Trivy Scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: '${{ secrets.DOCKER_USERNAME }}/task-manager-frontend:${{ github.sha }}'
-          severity: 'CRITICAL,HIGH'
-          
-      - name: Push to Docker Hub
-        run: |
-          echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
-          docker push ${{ secrets.DOCKER_USERNAME }}/task-manager-frontend:${{ github.sha }}
-```
-
----
-
-### 5. Prometheus Monitoring
-
-**What is Prometheus?**
-Prometheus is an open-source monitoring and alerting toolkit. It collects metrics from configured targets, stores them in a time-series database, and provides a powerful query language (PromQL) for analysis.
-
-**Components Deployed:**
-- **Prometheus Server**: Scrapes and stores metrics
-- **Alertmanager**: Handles alerts and notifications
-- **Node Exporter**: Collects host-level metrics
-- **Kube State Metrics**: Exposes Kubernetes object metrics
-
-**How to Install:**
-
-```bash
-# Create monitoring namespace
-kubectl create namespace monitoring
-
-# Apply HelmRepository
-kubectl apply -f - <<EOF
-apiVersion: source.toolkit.fluxcd.io/v1beta2
-kind: HelmRepository
-metadata:
-  name: prometheus-community
-  namespace: monitoring
-spec:
-  interval: 1h
-  url: https://prometheus-community.github.io/helm-charts
-EOF
-
-# Apply HelmRelease (kube-prometheus-stack)
-kubectl apply -f k8s/base/monitoring-helmrelease.yaml
-
-# Check installation
-kubectl get pods -n monitoring
-
-# Access Prometheus UI
-kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090
-```
-
-**Access URL:** http://localhost:9090
-
-**Useful PromQL Queries:**
-```promql
-# CPU usage by pod
-rate(container_cpu_usage_seconds_total{namespace="tms-app"}[5m])
-
-# Memory usage by pod
-container_memory_usage_bytes{namespace="tms-app"}
-
-# Pod restart count
-kube_pod_container_status_restarts_total{namespace="tms-app"}
-
-# Running pods count
-count(kube_pod_status_phase{namespace="tms-app",phase="Running"})
-
-# HTTP request rate (if metrics exposed)
-rate(http_requests_total{namespace="tms-app"}[5m])
-```
-
----
-
-### 6. Grafana Visualization
-
-**What is Grafana?**
-Grafana is an open-source analytics and visualization platform. It connects to data sources like Prometheus and provides rich dashboards for monitoring your infrastructure and applications.
-
-**How to Access:**
-
-```bash
-# Port-forward Grafana service
-kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
-```
-
-**Access URL:** http://localhost:3000
-**Credentials:** admin / admin123
-
-**Pre-configured Dashboards:**
-1. **Kubernetes Cluster Monitoring** (ID: 7249) - Cluster overview
-2. **Kubernetes Pods Monitoring** (ID: 6417) - Pod-level metrics
-3. **Node Exporter Full** (ID: 1860) - Host metrics
-4. **Task Management System** - Custom application dashboard
-
-**How to Import Additional Dashboards:**
-1. Click **+** icon in sidebar
-2. Select **Import**
-3. Enter Dashboard ID (e.g., 7249)
-4. Select Prometheus as data source
-5. Click **Import**
-
-**Custom Dashboard Panels:**
-- Pod count per service (Frontend, Auth, Task)
-- CPU usage graph
-- Memory usage graph
-- Network traffic
-- Pod restarts
-- HPA replica counts
-
----
-
-### 7. Horizontal Pod Autoscaler (HPA)
-
-**What is HPA?**
-HPA automatically scales the number of pod replicas based on observed CPU utilization, memory usage, or custom metrics. It ensures your application can handle varying loads efficiently.
-
-**Configuration Applied:**
 | Service | Min Replicas | Max Replicas | CPU Target | Memory Target |
 |---------|--------------|--------------|------------|---------------|
 | Frontend | 1 | 5 | 70% | 80% |
-| Auth Service | 2 | 10 | 70% | 80% |
-| Task Service | 2 | 10 | 70% | 80% |
+| Auth Service | 1 | 10 | 70% | 80% |
+| Task Service | 1 | 10 | 70% | 80% |
 
-**How to View HPA Status:**
+### Resource Allocation
 
-```bash
-# List all HPAs
-kubectl get hpa -n tms-app
+| Service | CPU Request | CPU Limit | Memory Request | Memory Limit |
+|---------|-------------|-----------|----------------|--------------|
+| Auth Service | 100m | 500m | 128Mi | 512Mi |
+| Task Service | 100m | 500m | 128Mi | 512Mi |
+| Frontend | 50m | 200m | 64Mi | 256Mi |
 
-# Detailed HPA information
-kubectl describe hpa frontend-hpa -n tms-app
+---
 
-# Watch HPA in real-time
-kubectl get hpa -n tms-app -w
-```
+## CI/CD Pipeline
 
-**Expected Output:**
-```
-NAME               REFERENCE                 TARGETS           MINPODS   MAXPODS   REPLICAS
-frontend-hpa       Deployment/frontend       15%/70%, 30%/80%  1         5         1
-auth-service-hpa   Deployment/auth-service   25%/70%, 45%/80%  2         10        2
-task-service-hpa   Deployment/task-service   20%/70%, 40%/80%  2         10        2
-```
+The GitHub Actions pipeline implements a comprehensive build, test, and deploy workflow.
 
-**HPA Configuration (`k8s/base/hpa.yaml`):**
+### Pipeline Stages
+
+**Stage 1: Version Generation**
+- Generates semantic version based on run number (MAJOR.MINOR.PATCH)
+- Outputs version tag for Docker image tagging
+
+**Stage 2: Change Detection**
+- Analyzes which services have changed
+- Triggers selective builds only for modified services
+- Reduces build time and resource consumption
+
+**Stage 3: Security Scanning**
+- Trivy filesystem scan for dependency vulnerabilities
+- SARIF report generation for GitHub Security tab integration
+- Configurable severity thresholds
+
+**Stage 4: Docker Build and Push**
+- Multi-stage Docker builds for optimized image size
+- Alpine-based images for minimal attack surface
+- Parallel builds for independent services
+- Automatic push to Docker Hub registry
+
+**Stage 5: Manifest Update**
+- Updates Kubernetes manifests with new image tags
+- Commits changes back to repository
+- Triggers Flux reconciliation for deployment
+
+**Stage 6: Notifications**
+- Slack integration for pipeline status updates
+- Success/failure notifications with build details
+
+### Pipeline Triggers
+
 ```yaml
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: auth-service-hpa
-  namespace: tms-app
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: auth-service
-  minReplicas: 2
-  maxReplicas: 10
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 70
-    - type: Resource
-      resource:
-        name: memory
-        target:
-          type: Utilization
-          averageUtilization: 80
-  behavior:
-    scaleDown:
-      stabilizationWindowSeconds: 300  # Wait 5 min before scaling down
-    scaleUp:
-      stabilizationWindowSeconds: 0    # Scale up immediately
+on:
+  push:
+    branches: [master, develop]
+    paths:
+      - 'services/auth-service/**'
+      - 'services/task-service/**'
+      - 'services/frontend/**'
+      - 'services/nginx/**'
 ```
 
 ---
 
-### 8. Trivy Security Scanner
+## Security Implementation
 
-**What is Trivy?**
-Trivy is a comprehensive security scanner that detects vulnerabilities in container images, file systems, Git repositories, and Kubernetes configurations.
+### Authentication and Authorization
 
-**Scan Types:**
-- **OS Packages**: Alpine, Debian, Ubuntu vulnerabilities
-- **Application Dependencies**: npm, pip, go modules
-- **IaC Misconfigurations**: Kubernetes, Terraform, CloudFormation
-- **Secrets**: API keys, passwords, tokens
+**JWT Token Flow:**
+1. User authenticates via /login endpoint
+2. Server validates credentials against hashed password
+3. JWT token generated with user ID and expiration
+4. Token returned to client for subsequent requests
+5. Protected endpoints validate token on each request
 
-**How to Use Locally:**
+**Password Requirements:**
+- Minimum 12 characters
+- At least one uppercase letter
+- At least one lowercase letter
+- At least one numeric digit
+- At least one special character
 
-```bash
-# Install Trivy
-sudo apt-get install trivy
+### Rate Limiting Configuration
 
-# Scan a Docker image
-trivy image khaledhawil/task-manager-frontend:latest
+| Endpoint Category | Window | Max Requests |
+|-------------------|--------|--------------|
+| Login | 15 minutes | 5 |
+| Registration | 1 hour | 3 |
+| General API | 15 minutes | 100 |
+| Task Creation | 1 minute | 20 |
 
-# Scan with severity filter
-trivy image --severity CRITICAL,HIGH khaledhawil/task-manager-auth:latest
+### Security Headers
 
-# Scan Kubernetes manifests
-trivy config ./k8s/
+The following HTTP security headers are applied via Helmet:
 
-# JSON output for CI/CD
-trivy image --format json --output results.json myimage:tag
-```
+| Header | Value |
+|--------|-------|
+| Content-Security-Policy | Restrictive CSP directives |
+| Strict-Transport-Security | max-age=31536000; includeSubDomains; preload |
+| X-Content-Type-Options | nosniff |
+| X-Frame-Options | DENY |
+| X-XSS-Protection | 1; mode=block |
 
-**CI/CD Integration:**
+### Kubernetes Security Context
+
+All pods run with the following security constraints:
+
 ```yaml
-- name: Trivy Vulnerability Scan
-  uses: aquasecurity/trivy-action@master
-  with:
-    image-ref: 'myimage:tag'
-    format: 'table'
-    exit-code: '1'              # Fail on vulnerabilities
-    severity: 'CRITICAL,HIGH'
-    ignore-unfixed: true
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
 ```
 
-**Severity Levels:**
-| Level | Action |
-|-------|--------|
-| CRITICAL | Block deployment, immediate fix required |
-| HIGH | Block deployment, fix within 7 days |
-| MEDIUM | Warning, plan remediation |
-| LOW | Informational |
+### Secret Management
 
----
+Sensitive values are managed via Kubernetes Secrets:
 
-### 9. Kustomize Configuration
-
-**What is Kustomize?**
-Kustomize is a Kubernetes-native configuration management tool. It allows you to customize application configurations without modifying the original YAML files using overlays.
-
-**Project Structure:**
-```
-k8s/
-├── base/                    # Base configurations
-│   ├── kustomization.yaml
-│   ├── namespace.yaml
-│   ├── frontend-deployment.yaml
-│   ├── auth-service-deployment.yaml
-│   └── ...
-└── overlays/
-    ├── local/               # Local environment overlay
-    │   ├── kustomization.yaml
-    │   ├── ingress.yaml
-    │   └── secrets.yaml
-    ├── staging/             # Staging overlay
-    └── production/          # Production overlay
-```
-
-**How to Use:**
-
-```bash
-# Preview generated manifests
-kubectl kustomize k8s/overlays/local
-
-# Apply with kustomize
-kubectl apply -k k8s/overlays/local
-
-# View differences before applying
-kubectl diff -k k8s/overlays/local
-```
-
-**Base Kustomization (`k8s/base/kustomization.yaml`):**
-```yaml
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-
-namespace: tms-app
-
-resources:
-  - namespace.yaml
-  - rbac.yaml
-  - network-policy.yaml
-  - pdb.yaml
-  - hpa.yaml
-  - frontend-deployment.yaml
-  - frontend-service.yaml
-  - auth-service-deployment.yaml
-  - auth-service.yaml
-  - task-service-deployment.yaml
-  - task-service.yaml
-  - mysql-configmap.yaml
-```
-
-**Overlay Kustomization (`k8s/overlays/local/kustomization.yaml`):**
-```yaml
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-
-resources:
-  - ../../base
-  - ingress.yaml
-  - mysql-deployment.yaml
-  - mysql-service.yaml
-  - mysql-pvc.yaml
-  - secrets.yaml
-
-images:
-  - name: khaledhawil/task-manager-frontend
-    newTag: "1.0.22"
-```
-
----
-
-## Prerequisites
-
-### Required Software
-
-| Tool | Version | Installation |
-|------|---------|--------------|
-| kubectl | v1.28+ | `curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"` |
-| Flux CLI | v2.0+ | `curl -s https://fluxcd.io/install.sh \| sudo bash` |
-| Git | v2.30+ | `sudo apt install git` |
-| htpasswd | - | `sudo apt install apache2-utils` |
-
-### Required Accounts
-
-- **GitHub**: Repository hosting and Actions
-- **Docker Hub**: Container image registry
-
-### System Requirements
-
-| Resource | Minimum | Recommended |
-|----------|---------|-------------|
-| CPU | 4 cores | 8 cores |
-| RAM | 8 GB | 16 GB |
-| Disk | 50 GB | 100 GB |
-| Nodes | 1 | 3 |
-
----
-
-## Complete Deployment Guide
-
-### Step 1: Clone Repository
-
-```bash
-git clone https://github.com/khaledhawil/End-to-End-DevOps-AWS-Nodejs-Python-MySQL.git
-cd End-to-End-DevOps-AWS-Nodejs-Python-MySQL
-```
-
-### Step 2: Set Up RKE2 Cluster
-
-Follow the [RKE2 Cluster Setup Guide](RKE2_cluster.md) or:
-
-```bash
-# On control plane
-curl -sfL https://get.rke2.io | sh -
-systemctl enable --now rke2-server.service
-
-# Configure kubectl
-mkdir -p ~/.kube
-cp /etc/rancher/rke2/rke2.yaml ~/.kube/config
-chmod 600 ~/.kube/config
-
-# Verify
-kubectl get nodes
-```
-
-### Step 3: Install Flux CD
-
-```bash
-# Install CLI
-curl -s https://fluxcd.io/install.sh | sudo bash
-
-# Install in cluster
-flux install
-
-# Verify
-flux check
-```
-
-### Step 4: Deploy Application via Flux
-
-```bash
-# Apply GitRepository
-kubectl apply -f flux/clusters/local/git-repository.yaml
-
-# Apply Kustomization
-kubectl apply -f flux/clusters/local/kustomization-app.yaml
-
-# Monitor deployment
-flux get kustomizations -w
-```
-
-### Step 5: Install Weave GitOps Dashboard
-
-```bash
-# Create admin credentials
-HASHED=$(htpasswd -nbB admin admin123 | cut -d: -f2)
-kubectl create secret generic cluster-user-auth \
-  --namespace flux-system \
-  --from-literal=username=admin \
-  --from-literal=password="$HASHED"
-
-# Apply HelmRepository and HelmRelease
-kubectl apply -f flux/clusters/local/ww-gitops-helmrepo.yaml
-kubectl apply -f flux/clusters/local/ww-gitops-helmrelease.yaml
-```
-
-### Step 6: Deploy Monitoring Stack
-
-```bash
-# Create namespace
-kubectl create namespace monitoring
-
-# Apply Prometheus stack
-kubectl apply -f k8s/base/monitoring-helmrelease.yaml
-
-# Wait for pods
-kubectl get pods -n monitoring -w
-```
-
-### Step 7: Verify Deployment
-
-```bash
-# Check all pods
-kubectl get pods -A
-
-# Check services
-kubectl get svc -n tms-app
-kubectl get svc -n monitoring
-
-# Check HPA
-kubectl get hpa -n tms-app
-
-# Check Flux status
-flux get all
-```
-
----
-
-## Accessing the Applications
-
-### Application URLs
-
-| Application | Access Method | URL |
-|-------------|---------------|-----|
-| Frontend | Port-forward | `kubectl port-forward svc/frontend-service -n tms-app 8080:80` then http://localhost:8080 |
-| Grafana | Port-forward | `kubectl port-forward svc/kube-prometheus-stack-grafana -n monitoring 3000:80` then http://localhost:3000 |
-| Prometheus | Port-forward | `kubectl port-forward svc/kube-prometheus-stack-prometheus -n monitoring 9090:9090` then http://localhost:9090 |
-| Weave GitOps | Port-forward | `kubectl port-forward svc/ww-gitops-weave-gitops -n flux-system 9001:9001` then http://localhost:9001 |
-| Alertmanager | Port-forward | `kubectl port-forward svc/kube-prometheus-stack-alertmanager -n monitoring 9093:9093` then http://localhost:9093 |
-
-### Credentials
-
-| Application | Username | Password |
-|-------------|----------|----------|
-| Grafana | admin | admin123 |
-| Weave GitOps | admin | admin123 |
+| Secret Name | Contains |
+|-------------|----------|
+| jwt-secret | JWT signing key |
+| db-password | MySQL root password |
+| db-username | MySQL username |
+| sql-endpoint | MySQL service endpoint |
 
 ---
 
 ## Monitoring and Observability
 
-### Grafana Dashboards
+### Prometheus Stack
 
-1. **Task Management System Dashboard**
-   - Pod status for all services
-   - CPU and memory usage
-   - Network traffic
-   - Pod restarts
-   - HPA metrics
+The monitoring infrastructure includes:
 
-2. **Kubernetes Cluster Dashboard**
-   - Node health
-   - Resource utilization
-   - Cluster capacity
+- **Prometheus**: Metrics collection and storage
+- **Grafana**: Visualization dashboards
+- **AlertManager**: Alert routing and notifications
 
-3. **Node Exporter Dashboard**
-   - Host CPU, memory, disk
-   - Network interfaces
-   - System load
+### Service Monitors
 
-### Alerting Rules
+Custom ServiceMonitor resources collect metrics from:
 
-Pre-configured alerts:
-- Pod crash looping
-- High CPU usage (>80%)
-- High memory usage (>80%)
-- Node not ready
-- Deployment replica mismatch
+- Auth Service (/metrics endpoint)
+- Task Service (/metrics endpoint)
+- Frontend (nginx metrics)
 
----
+### Health Checks
 
-## Repository Structure
+All services implement health endpoints:
 
-```
-.
-├── .github/
-│   └── workflows/
-│       └── ci-cd-pipeline.yml      # GitHub Actions CI/CD
-│
-├── flux/
-│   └── clusters/
-│       ├── local/                  # Local environment
-│       │   ├── git-repository.yaml
-│       │   └── kustomization-app.yaml
-│       ├── staging/
-│       └── production/
-│
-├── k8s/
-│   ├── base/                       # Base manifests
-│   │   ├── kustomization.yaml
-│   │   ├── namespace.yaml
-│   │   ├── rbac.yaml
-│   │   ├── network-policy.yaml
-│   │   ├── pdb.yaml
-│   │   ├── hpa.yaml
-│   │   ├── grafana-dashboard.yaml
-│   │   ├── monitoring-helmrelease.yaml
-│   │   ├── frontend-deployment.yaml
-│   │   ├── auth-service-deployment.yaml
-│   │   ├── task-service-deployment.yaml
-│   │   └── ...
-│   └── overlays/
-│       ├── local/
-│       ├── staging/
-│       └── production/
-│
-├── services/
-│   ├── frontend/                   # React application
-│   ├── auth-service/               # Node.js API
-│   └── task-service/               # Python API
-│
-├── scripts/
-│   └── verify-security.sh
-│
-├── Screenshots/                    # Documentation images
-│
-└── README.md
-```
+| Service | Endpoint | Interval |
+|---------|----------|----------|
+| Auth Service | GET /health | 10s |
+| Task Service | GET /health | 10s |
+| Frontend | GET /health | 10s |
+
+### Kubernetes Probes
+
+| Probe Type | Initial Delay | Period | Timeout | Failure Threshold |
+|------------|---------------|--------|---------|-------------------|
+| Liveness | 30s | 10s | 5s | 3 |
+| Readiness | 10s | 5s | 3s | 3 |
 
 ---
 
-## Screenshots
+## Local Development
 
-### Task Management Application
-![Task Application](Screenshots/task-app.png)
-*Main dashboard showing task management interface*
+### Prerequisites
 
-### CI/CD Pipeline
-![CI/CD Pipeline](Screenshots/cd-pipline.png)
-*GitHub Actions workflow with build and scan stages*
+- Docker and Docker Compose
+- Node.js 22.x (for local development)
+- Python 3.12 (for local development)
 
-### Pipeline Summary
-![Pipeline Summary](Screenshots/pipline-summary.png)
-*Overview of all pipeline jobs and status*
+### Quick Start
 
-### Kubernetes Cluster
-![Kubernetes Cluster](Screenshots/k8s-cluster.png)
-*RKE2 cluster nodes and workloads*
-
-### Weave GitOps Dashboard
-![Weave GitOps](Screenshots/weavy-gui.png)
-*Flux resources in Weave GitOps UI*
-
-### Application in Weave GitOps
-![App in Weave](Screenshots/app-on-weavy.png)
-*Application kustomization status*
-
-### Grafana Monitoring
-![Grafana](Screenshots/Grafana.png)
-*Prometheus metrics visualized in Grafana*
-
-### Slack Notifications
-![Slack](Screenshots/slack-.png)
-*Security scan alerts in Slack*
-
----
-
-## Troubleshooting Guide
-
-### Flux Issues
-
-**Kustomization not syncing:**
 ```bash
-# Check status
-flux get kustomizations
+# Clone the repository
+git clone https://github.com/khaledhawil/End-to-End-DevOps-AWS-Nodejs-Python-MySQL.git
+cd End-to-End-DevOps-AWS-Nodejs-Python-MySQL
 
-# View events
-kubectl describe kustomization task-management-system-local -n flux-system
+# Start all services
+cd services
+docker-compose up -d
 
-# Force reconcile
-flux reconcile kustomization task-management-system-local --with-source
+# Access the application
+# Frontend: http://localhost
+# Auth Service: http://localhost:8001
+# Task Service: http://localhost:8002
 ```
 
-**GitRepository not found:**
+### Development Workflow
+
 ```bash
-# Check source status
-flux get sources git
+# Rebuild specific service after changes
+docker-compose up -d --build auth-service
 
-# Check for errors
-kubectl logs -n flux-system deployment/source-controller
-```
-
-### Pod Issues
-
-**Pods stuck in Pending:**
-```bash
-# Check events
-kubectl describe pod <pod-name> -n tms-app
-
-# Check node resources
-kubectl top nodes
-
-# Check PVC status
-kubectl get pvc -n tms-app
-```
-
-**Pods in CrashLoopBackOff:**
-```bash
 # View logs
-kubectl logs <pod-name> -n tms-app --previous
+docker-compose logs -f auth-service
 
-# Check resource limits
-kubectl describe pod <pod-name> -n tms-app | grep -A5 "Limits"
+# Stop all services
+docker-compose down
+
+# Stop and remove volumes
+docker-compose down -v
 ```
 
-### Database Issues
+---
 
-**Connection refused:**
+## Kubernetes Deployment
+
+### Prerequisites
+
+- Kubernetes cluster (RKE2, EKS, GKE, or similar)
+- kubectl configured with cluster access
+- Flux CD installed
+- Docker Hub account for image registry
+
+### Flux GitOps Setup
+
 ```bash
-# Check MySQL pod
+# Bootstrap Flux with your repository
+flux bootstrap github \
+  --owner=<your-github-username> \
+  --repository=End-to-End-DevOps-AWS-Nodejs-Python-MySQL \
+  --branch=master \
+  --path=./flux/clusters/local \
+  --personal
+
+# Verify Flux installation
+flux check
+
+# Monitor reconciliation
+flux get kustomizations --watch
+```
+
+### Manual Deployment
+
+```bash
+# Apply base resources
+kubectl apply -k k8s/base
+
+# Apply environment-specific overlay
+kubectl apply -k k8s/overlays/local
+
+# Verify deployment
+kubectl get pods -n tms-app
+kubectl get svc -n tms-app
+kubectl get ingress -n tms-app
+```
+
+### Environment-Specific Configuration
+
+| Environment | Overlay Path | Database | Secrets |
+|-------------|--------------|----------|---------|
+| Local | k8s/overlays/local | Local MySQL pod | Local secrets.yaml |
+| Staging | k8s/overlays/staging | Local MySQL pod | Staging secrets.yaml |
+| Production | k8s/overlays/production | AWS RDS | Sealed Secrets |
+
+---
+
+## Environment Configuration
+
+### Required Environment Variables
+
+**Auth Service:**
+| Variable | Description | Default |
+|----------|-------------|---------|
+| PORT | Service port | 8001 |
+| DB_HOST | MySQL hostname | - |
+| DB_USER | MySQL username | - |
+| DB_PASSWORD | MySQL password | - |
+| DB_NAME | Database name | task_management |
+| JWT_SECRET | Token signing key | - |
+
+**Task Service:**
+| Variable | Description | Default |
+|----------|-------------|---------|
+| PORT | Service port | 8002 |
+| DB_HOST | MySQL hostname | - |
+| DB_USER | MySQL username | - |
+| DB_PASSWORD | MySQL password | - |
+| DB_NAME | Database name | task_management |
+| JWT_SECRET | Token signing key | - |
+| ALLOWED_ORIGINS | CORS allowed origins | localhost |
+
+### GitHub Actions Secrets
+
+| Secret | Purpose |
+|--------|---------|
+| DOCKER_USERNAME | Docker Hub username |
+| DOCKER_TOKEN | Docker Hub access token |
+| SLACK_WEBHOOK_URL | Slack notifications (optional) |
+
+---
+
+## API Reference
+
+### Authentication Endpoints
+
+**Register User**
+```
+POST /register
+Content-Type: application/json
+
+{
+  "username": "string (3-50 chars, alphanumeric)",
+  "password": "string (12+ chars, complexity requirements)"
+}
+
+Response: 201 Created
+{
+  "message": "User registered successfully"
+}
+```
+
+**Login**
+```
+POST /login
+Content-Type: application/json
+
+{
+  "username": "string",
+  "password": "string"
+}
+
+Response: 200 OK
+{
+  "token": "jwt-token-string"
+}
+```
+
+### Task Endpoints
+
+**List Tasks**
+```
+GET /tasks
+Authorization: Bearer <token>
+
+Response: 200 OK
+[
+  {
+    "id": 1,
+    "title": "string",
+    "description": "string",
+    "priority": "low|medium|high",
+    "status": "pending|in_progress|completed",
+    "created_at": "timestamp"
+  }
+]
+```
+
+**Create Task**
+```
+POST /tasks
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "title": "string (1-200 chars)",
+  "description": "string (1-2000 chars)",
+  "priority": "low|medium|high"
+}
+
+Response: 201 Created
+{
+  "message": "Task created successfully",
+  "id": 1
+}
+```
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+**Pods in CrashLoopBackOff**
+```bash
+# Check pod logs
+kubectl logs -n tms-app <pod-name>
+
+# Check pod events
+kubectl describe pod -n tms-app <pod-name>
+
+# Common causes:
+# - Missing secrets
+# - Database connection failure
+# - Invalid JWT_SECRET configuration
+```
+
+**Database Connection Errors**
+```bash
+# Verify MySQL pod is running
 kubectl get pods -n tms-app -l app=mysql
 
 # Check MySQL logs
-kubectl logs -n tms-app deployment/mysql
+kubectl logs -n tms-app -l app=mysql
 
-# Test connection
-kubectl exec -it deployment/mysql -n tms-app -- mysql -u root -p
+# Test connectivity from service pod
+kubectl exec -it -n tms-app <auth-pod> -- nc -zv mysql-service 3306
 ```
 
-### Monitoring Issues
-
-**Grafana shows no data:**
+**HPA Thrashing (Constant Scaling)**
 ```bash
-# Check Prometheus is running
-kubectl get pods -n monitoring | grep prometheus
+# Check HPA status
+kubectl get hpa -n tms-app
 
-# Verify Prometheus targets
-# Go to Prometheus UI > Status > Targets
+# Review scaling events
+kubectl describe hpa -n tms-app auth-service-hpa
 
-# Check ServiceMonitors
-kubectl get servicemonitor -n tms-app
+# Solution: Adjust stabilization windows in k8s/base/hpa.yaml
 ```
 
-**HPA shows unknown metrics:**
+**Flux Reconciliation Failures**
 ```bash
-# Check metrics-server
-kubectl get pods -n kube-system | grep metrics
+# Check Flux logs
+flux logs --level=error
 
-# Verify HPA
-kubectl describe hpa -n tms-app
+# Force reconciliation
+flux reconcile kustomization task-management-system-local
+
+# Suspend and resume
+flux suspend kustomization task-management-system-local
+flux resume kustomization task-management-system-local
 ```
 
-### Network Issues
+### Health Check Commands
 
-**Services not reachable:**
 ```bash
-# Check service endpoints
-kubectl get endpoints -n tms-app
+# Full cluster health
+kubectl get pods -n tms-app
+kubectl get svc -n tms-app
+kubectl get ingress -n tms-app
+kubectl top pods -n tms-app
 
-# Test internal connectivity
-kubectl run test --rm -it --image=busybox -- wget -qO- http://frontend-service.tms-app
-
-# Check network policies
-kubectl get networkpolicy -n tms-app
+# Service-specific health
+curl -s http://<ingress-ip>/api/auth/health
+curl -s http://<ingress-ip>/api/tasks/health
 ```
 
 ---
 
 ## License
 
-This project is provided for educational and demonstration purposes.
+This project is licensed under the MIT License.
+
+---
 
 ## Contributing
 
-Contributions are welcome. Please submit pull requests with clear descriptions of changes.
+1. Fork the repository
+2. Create a feature branch
+3. Commit changes with descriptive messages
+4. Push to your fork
+5. Open a Pull Request
+
+---
 
 ## Author
 
-Khaled Hawil - DevOps Engineer
+Khaled Hawil
+
+---
+
+## Acknowledgments
+
+- Kubernetes documentation and community
+- Flux CD project maintainers
+- GitHub Actions team
+- Open source security tools contributors
