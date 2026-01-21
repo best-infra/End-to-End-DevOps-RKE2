@@ -8,14 +8,3 @@
 k8s.pem
 .env
 *.env*
-node_modules/
-dist/
-.DS_Store
-.vscode/
-.idea/
-*.log
-*.swp
-.vs/
-.venv/
-
-# MacOS files
